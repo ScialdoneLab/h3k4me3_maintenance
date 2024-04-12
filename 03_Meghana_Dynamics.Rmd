@@ -1,0 +1,74 @@
+---
+title: "Meghana H3K4me3 Maintenance - 03 Dynamics analysis"
+output: html_notebook
+---
+
+##Load categories
+```{r}
+#RNA
+load("rna_data.RData")
+
+#H3K4me3
+load("chip_data_bin.RData")
+#load("chip_data_peaks.RData")
+```
+
+##Dotplot
+```{r message=FALSE, warning=FALSE}
+library(ggpubr)
+rna_ordered <- rna_dyns[c("Monly", "Ponly", "MPonly", "MZonly", "PZonly", "MPZ", "Zonly")]
+chip_ordered <- chip_dyns[c("H_L_L_L", "L_H_L_L",  "H_H_L_L", "H_L_H_L", "L_H_H_L", "H_H_H_L", "H_L_L_H", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H","L_H_L_H",  "L_L_H_H", "L_L_H_L", "L_L_L_H")] #"L_L_L_L")]
+stages_legend = "[Spermatid, Sperm, Pre-ZGA, ZGA]"
+
+#remove sperm or spermatid (optional)
+#chip_ordered <- list("H_L_L"=c(chip_dyns["H_L_L_L"][[1]], chip_dyns["H_H_L_L"][[1]]),
+#                      "H_H_L"=c(chip_dyns["H_L_H_L"][[1]], chip_dyns["H_H_H_L"][[1]]), 
+#                      "H_H_H"=c(chip_dyns["H_L_H_H"][[1]], chip_dyns["H_H_H_H"][[1]]),
+#                      "L_H_H"=c(chip_dyns["L_L_H_H"][[1]], chip_dyns["L_H_H_H"][[1]]), 
+#                      "L_L_H"=c(chip_dyns["L_L_L_H"][[1]], chip_dyns["L_H_L_H"][[1]]),
+#                      "L_L_L"=c(chip_dyns["L_L_L_L"][[1]], chip_dyns["L_H_L_L"][[1]]),
+#                      "L_H_L"=c(chip_dyns["L_L_H_L"][[1]], chip_dyns["L_H_H_L"][[1]]),
+#                      "H_L_H"=c(chip_dyns["H_L_L_H"][[1]], chip_dyns["H_H_L_H"][[1]]))
+#stages_legend = "[Spermatid, Pre-ZGA, ZGA]"
+
+genesAbsolute <- lapply(chip_ordered, function(x){as.data.frame(lapply(rna_ordered, function(y){length(intersect(x, y))}))})
+genesAbsolute <- do.call(rbind, genesAbsolute)
+
+fisher_p <- function(row, column){
+  mat = genesAbsolute
+  fisher_mat <- matrix(c(mat[row, column], sum(mat[-row, column]), sum(mat[row, -column]), sum(mat[-row, -column])), nrow=2)
+  p_val <- fisher.test(fisher_mat)$p.value
+  return(max(p_val, (1e-300)))
+}
+
+p_mat = data.frame(matrix(NA, nrow = nrow(genesAbsolute), ncol = ncol(genesAbsolute)), row.names = rownames(genesAbsolute))
+colnames(p_mat) = colnames(genesAbsolute)
+
+for (row in 1:nrow(p_mat)){
+  for (col in 1:ncol(p_mat)){
+    p_mat[row, col] <- fisher_p(row, col)
+  }
+}
+
+p_mat = -log10(p_mat)
+
+## Sort by similarity
+#p_mat[p_mat < (-log10(0.05))] <- 0
+#h3k4me3_dist<-dist(p_mat, method="euclidean")
+#h3k4me3_clust<-hclust(h3k4me3_dist, method='complete')
+
+#rna_dist<-dist(t(p_mat), method="euclidean")
+#rna_clust<-hclust(rna_dist, method='complete')
+
+#p_mat <- p_mat[h3k4me3_clust$order, rna_clust$order]
+
+p_mat[p_mat < (-log10(0.05))] <- NA
+#p_mat <- p_mat[rowSums(is.na(p_mat)) != ncol(p_mat), ] # remove empty rows
+p_mat <- p_mat[!rownames(p_mat) %in% c("L_L_L_L", "L_L_L"), colnames(p_mat) != "ND"] # not-detected does not mean not expressed (very uncertain sets)
+
+my_cols <- c("#6A00A8FF", "#FCA636FF", "#F0F921FF", "#F0F921FF")
+ggballoonplot(p_mat, fill="value") +
+                      theme_light() + labs(x="RNA expression dynamics", y=paste0("H3K4me3 TSS dynamics\n", stages_legend)) +
+                      scale_fill_gradientn(colors = my_cols, values=c(0, 0.05, 0.5, 1), breaks=c(0, 2, 20, 50, 100, 200)) + guides(size=guide_legend(title="-log10(Fisher independence p value)"), fill=guide_legend(title="-log10(Fisher independence p value)")) + scale_size(range = c(0, 10), breaks =c(0, 2, 20, 50, 100, 200))
+```
+

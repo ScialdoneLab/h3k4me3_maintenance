@@ -1,0 +1,257 @@
+---
+title: "Meghana H3K4me3 Maintenance - 04 DNAme"
+output: html_notebook
+---
+
+##Load outputs of other scripts
+```{r}
+#RNA
+load("rna_data.RData")
+
+#H3K4me3
+load("../NGS_data_sorted/h3k4me3_data_log.RData")
+#load("chip_data_bin.RData")
+#load("chip_data_peaks.RData")
+```
+
+##Load genome and fasta (run for uncached binarization or peak calling data)
+```{r warning=FALSE}
+suppressPackageStartupMessages(library(AnnotationDbi))
+Xenla10.1_TxDb <- loadDb("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/Xenla10.1.sqlite")
+allgenes <- genes(Xenla10.1_TxDb)
+rm(Xenla10.1_TxDb)
+
+suppressPackageStartupMessages(library(Biostrings))
+Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
+chr <- names(Xenla10.1_fa[1:18, ])
+rm(Xenla10.1_fa)
+
+promoters <- promoters(allgenes, upstream = 0, downstream = 1)
+promoters_chr <- promoters[seqnames(promoters) %in% chr]
+```
+
+##Utility functions
+```{r}
+suppressPackageStartupMessages(library(EnrichedHeatmap))
+enrichment <- function(coverage, title){
+  coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
+  coverage <- log2(coverage+1)
+  hm <- EnrichedHeatmap(coverage, 
+                        name = title,
+                        column_title = title,
+                        col = c("blue", "red"),
+                        axis_name = c("-1kb", "TSS", "+1kb"))
+  draw(hm)
+  return(enriched_score(coverage))
+}
+```
+
+##Load DNAme Sperm
+```{r message=FALSE, warning=FALSE}
+setwd("../NGS_data_sorted/2_Sperm_DNAme_Teperek_Xl10.1/GSE75164")
+
+#IP coverage replicates
+D2_cov1 <- readRDS("GSM1944464_ranges.rds")
+D2_cov2 <- readRDS("GSM1944465_ranges.rds")
+D2_cov3 <- readRDS("GSM1944466_ranges.rds")
+D2_spDNAme_cov <- c(D2_cov1, D2_cov2, D2_cov3)
+
+#Delete individual replicates
+rm(D2_cov1, D2_cov2, D2_cov3)
+
+suppressWarnings({D2_spDNAme_cov <- resize(D2_spDNAme_cov, 200)})
+D2_spDNAme_cov <- trim(D2_spDNAme_cov)
+D2_spDNAme_cov <- D2_spDNAme_cov[seqnames(D2_spDNAme_cov) %in% chr]
+DNAme_sperm <- enrichment(D2_spDNAme_cov, "DNAme Sperm")
+```
+
+##Load DNAme Pre-ZGA
+```{r message=FALSE, warning=FALSE}
+setwd("../NGS_data_sorted/4_256c_DNAme_own_Xl10.1")
+
+#IP coverage replicates
+D4_cov1 <- readRDS("3a_256c_IP_ranges.rds")
+D4_cov2 <- readRDS("3b_256c_IP_ranges.rds")
+D4_S7DNAme_cov <- c(D4_cov1, D4_cov2)
+
+#Delete individual replicates
+rm(D4_cov1, D4_cov2)
+
+D4_S7DNAme_cov <- D4_S7DNAme_cov[seqnames(D4_S7DNAme_cov) %in% chr]
+DNAme_prezga <- enrichment(D4_S7DNAme_cov, "DNAme Pre-ZGA")
+```
+
+## Accessibility
+```{r}
+setwd("../NGS_data_sorted/5_256c_DamID_own_Xl10.1")
+library(chromstaR)
+
+#read Bam files i.e. coverage files as GRanges objects
+D5_cov1 <- readBamFileAsGRanges(bamfile = "Dam_1_SLX-20130_AR008_s_1_r.sorted.bam", bamindex = "Dam_1_SLX-20130_AR008_s_1_r.sorted.bam.bai")
+D5_cov2 <- readBamFileAsGRanges(bamfile = "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam", bamindex = "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam.bai")
+D5_S7Dam_cov <- c(D5_cov1, D5_cov2)
+
+#Delete individual replicates
+rm(D5_cov1, D5_cov2)
+
+suppressWarnings({D5_S7Dam_cov <- resize(D5_S7Dam_cov, 200)})
+D5_S7Dam_cov <- trim(D5_S7Dam_cov)
+D5_S7Dam_cov <- D5_S7Dam_cov[seqnames(D5_S7Dam_cov) %in% chr]
+
+DamID_prezga <- enrichment(D5_S7Dam_cov, "Accessibility Pre-ZGA")
+```
+
+
+## CG density
+```{r}
+library(BSgenome)
+promoters_2kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
+promoters_chr_2kb <- promoters_2kb[seqnames(promoters_2kb) %in% chr]
+promoters_chr_2kb <- promoters_chr_2kb[promoters_chr_2kb$gene_id != "LOC108718344"]
+
+Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
+promSeqs <- Xenla10.1_fa[promoters_chr_2kb]
+
+CGgen <- data.frame()
+for (i in 1:length(promSeqs)) {
+  freq <- dinucleotideFrequency(promSeqs[i])[7]
+  row <- c(names(promSeqs[i]), freq/2000)
+  CGgen <- rbind(CGgen, row)
+}
+
+cg_density <- as.numeric(CGgen[,2])
+names(cg_density) <- CGgen[,1]
+```
+
+##Save data
+```{r}
+save(H3K4me3_prezga, DNAme_sperm, DNAme_prezga, DamID_prezga, cg_density, file="prezga_data.RData")
+```
+
+##Load data
+```{r}
+load("prezga_data.RData")
+```
+
+##Unsupervised clustering heatmap
+```{r fig.height=9, fig.width=3, message=FALSE, warning=FALSE}
+library(ComplexHeatmap)
+library(RColorBrewer)
+library(circlize)
+library(corrplot)
+library(scales)
+
+genes = names(cg_density)
+heatmap_data <- data.frame(H3K4me3=H3K4me3_prezga[genes,1], DNAme=DNAme_prezga[genes], Accessibility=DamID_prezga[genes], 
+                           "CG density"=cg_density)
+
+#heatmap_data <- heatmap_data[sample(1:nrow(heatmap_data), 1000, replace=FALSE),]
+scaled_data = as.matrix(scale(heatmap_data))
+
+set.seed(12)
+kclus <- kmeans(scaled_data, 8)
+cluster_order = c(4,5,2,6,8,7,3,1)
+split <- factor(kclus$cluster, levels=cluster_order)
+
+col_fun = colorRamp2(seq(-2, 2), rev(COL2("RdBu", n=5)))
+hm1 <- Heatmap(scaled_data, 
+        name = "Enrichment z-score",
+        col = col_fun,
+        column_title = "Datasets", row_title = "Genes",
+        show_row_dend = FALSE,
+        cluster_columns = FALSE,
+        show_row_names = FALSE,
+        column_order = c("H3K4me3", "Accessibility", "DNAme", "CG.density"),
+        row_split = split,
+        cluster_row_slices = FALSE
+)
+
+draw(hm1)
+```
+
+## RNA dynamic enrichment
+```{r fig.height=5, fig.width=10}
+library(reshape2)
+library(ggplot2)
+library(tidyr)
+
+rna_dyn_map = melt(rna_dyns)
+rownames(rna_dyn_map) <- rna_dyn_map[,1]
+
+data_df <- data.frame(rna_dyn_map[names(kclus$cluster), 2], kclus$cluster)
+colnames(data_df)<- c("Gene expression", "Cluster")
+table_df <- data.frame(table(data_df)[,rev(cluster_order)])
+
+log_enrich <- function(x) {
+  category_freq <- sum(table_df[table_df$Gene.expression==x["Gene.expression"],"Freq"])
+  cluster_ratio <- sum(table_df[table_df$Cluster==x["Cluster"],"Freq"]) / sum(table_df$Freq)
+  expected_freq <- category_freq * cluster_ratio
+  enrich <-  as.numeric(x["Freq"]) / expected_freq
+  if(enrich == 0){log_enrich = NA}
+  else{log_enrich <- log(enrich)}
+  return(log_enrich)
+}
+table_df$log_enrichment <- apply(table_df, 1, log_enrich) 
+table_wide <- as.data.frame(pivot_wider(table_df[,c(1,2,4)], names_from=Cluster,values_from = log_enrichment))
+rownames(table_wide) <- unlist(table_wide[1])
+ggplot(table_df, aes(Cluster, Gene.expression)) + geom_tile(aes(fill = log_enrichment)) +
+  geom_text(aes(label = round(log_enrichment,2))) + theme_pubr() +
+  scale_fill_gradient2(low="blue", mid="white", high="red", limit=c(-3.5, 3.5))
+
+ggplot(table_df, aes(Cluster, Gene.expression, fill = log_enrichment)) +
+  geom_point(shape = 21, stroke = 0, size=10) +
+  scale_fill_gradient2(low="blue", mid="white", high="red", limit=c(-3.5, 3.5)) + guides(fill=guide_colorbar(title="Log enrichment of number of genes in respective cluster")) + theme_pubr() + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+```
+
+
+##Heatmap per H3K4me3/RNA dynamic
+```{r message=FALSE, warning=FALSE}
+chip_dyn_map = melt(chip_dyns)
+rownames(chip_dyn_map) <- chip_dyn_map[,1]
+
+genes = names(cg_density)
+heatmap_data <- data.frame("CG.density"=cg_density, "DNAme.Pre-ZGA"=DNAme_prezga[genes], "Accessibility.Pre-ZGA"=DamID_prezga[genes],
+                           "DNAme.Sperm"=DNAme_sperm[genes], "RNA.group"=rna_dyn_map[genes, 2], "Chip.group"=chip_dyn_map[genes, 2])
+heatmap_data$RNA.group[is.na(heatmap_data$RNA.group)] <- "ND"
+
+### RNA plot
+mean_data <- aggregate(. ~  RNA.group, data=heatmap_data[!colnames(heatmap_data) %in% c("Chip.group")], FUN=mean)
+rownames(mean_data) <- mean_data[,"RNA.group"]
+mean_data <- mean_data[,-1]
+scaled_data = as.matrix(scale(mean_data))
+scaled_data <- t(scaled_data)
+hm_rna <- Heatmap(scaled_data, 
+        name = "Enrichment z-score",
+        col = col_fun,
+        column_title = "Datasets", row_title = "Genes",
+        show_row_dend = FALSE,
+        cluster_columns = FALSE,
+        show_row_names = TRUE,
+        column_order =  c("Monly", "Ponly", "MPonly", "MZonly", "PZonly", "MPZ", "Zonly", "ND"),
+        row_split = seq(1:nrow(scaled_data)),
+        cluster_row_slices = FALSE
+)
+draw(hm_rna)
+
+### Chip plot
+mean_data <- aggregate(. ~  Chip.group, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group")], FUN=mean)
+rownames(mean_data) <- mean_data[,"Chip.group"]
+mean_data <- mean_data[,-1]
+scaled_data = as.matrix(scale(mean_data))
+scaled_data <- t(scaled_data)
+hm_chip <- Heatmap(scaled_data, 
+        name = "Enrichment z-score",
+        col = col_fun,
+        column_title = "Datasets", row_title = "Genes",
+        show_row_dend = FALSE,
+        cluster_columns = FALSE,
+        show_row_names = TRUE,
+        column_order =  c("H_L_L_L", "L_H_L_L",  "H_H_L_L", "H_L_H_L", "L_H_H_L", "H_H_H_L", "H_L_L_H", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H","L_H_L_H",  "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L"),
+        row_split = seq(1:nrow(scaled_data)),
+        cluster_row_slices = FALSE
+)
+draw(hm_chip)
+
+```

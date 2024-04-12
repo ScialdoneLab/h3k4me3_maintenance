@@ -1,0 +1,222 @@
+---
+title: "Meghana H3K4me3 Maintenance - 02 RNA-Seq analysis"
+output: html_notebook
+---
+##Colors
+```{r}
+cols_rnadyns = c(Monly="#1B9E77", Ponly="#D95F02", Zonly = "#7570B3", MPonly = "#E7298A", MZonly = "#66A61E", PZonly = "#E6AB02", MPZ = "#A6761D", ND = "#666666")
+cols_biscale <- c("lightgoldenrod1", "chocolate3", "firebrick4")
+vir_cols <- c("#fde725", "#5ec962", "#21918c", "#3b528b", "#440154")
+```
+
+## Load Teperek TPM
+```{r warning=FALSE}
+detected_thr = 5
+library(Seurat)
+
+teperek_se <- readRDS("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_rnaseq/GSE75164/se.rds")
+teperek <- as.data.frame(assays(teperek_se)$tpms)
+teperek$name = rowData(teperek_se)$name
+teperek <- teperek[!duplicated(teperek$name),]
+
+spermatid.detected <- teperek[teperek[,"GSM1944414"] > detected_thr & teperek[,"GSM1944415"] > detected_thr & teperek[,"GSM1944416"] > detected_thr, "name"]
+spermatid.detected <- unique(spermatid.detected)
+```
+
+##Load dataset: Egg + Nascent (Chen)
+```{r}
+detected_thr = 5
+chen_se <- readRDS("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_rnaseq/GSE201835/se.rds")
+chen <- as.data.frame(assays(chen_se)$tpms)
+chen$name = rowData(chen_se)$name
+chen <- chen[!duplicated(chen$name),]
+
+egg.detected <- chen[chen[,"GSM6076970"] > detected_thr & chen[,"GSM6076971"] > detected_thr, "name"]
+egg.detected <- unique(egg.detected)
+
+zga_nascent.6hpf = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > detected_thr &     
+                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > detected_thr
+zga_nascent.7hpf = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > detected_thr & 
+                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > detected_thr
+zga_nascent.8hpf = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > detected_thr & 
+                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > detected_thr
+zga_nascent.9hpf = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > detected_thr & 
+                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > detected_thr
+
+zga_nascent.detected <- zga_nascent.6hpf | zga_nascent.7hpf | zga_nascent.8hpf | zga_nascent.9hpf
+zga_nascent.detected <- unique(chen[zga_nascent.detected, "name"])
+```
+
+###Detected genes at each stage
+```{r}
+rna_genes <- unique(union(chen$name, teperek$name))
+spermatid.detected <- spermatid.detected[spermatid.detected %in% rna_genes]
+egg.detected <- egg.detected[egg.detected %in% rna_genes]
+zga_nascent.detected <- zga_nascent.detected[zga_nascent.detected %in% rna_genes]
+```
+
+###Venn diagram with all gene groups
+```{r}
+library(VennDiagram)
+grid.newpage()
+venn <- venn.diagram(
+        x = list(egg.detected, spermatid.detected, zga_nascent.detected), filename=NULL, output=TRUE,
+        category.names = c("Detected in Egg" , "Detected in\nSpermatid" , "Detected at ZGA (nascent)"))
+
+grid.draw(venn)
+
+grid.newpage()
+venn <- venn.diagram(
+        x = list(unique(chen[zga_nascent.6hpf, "name"]), unique(chen[zga_nascent.7hpf, "name"]), unique(chen[zga_nascent.8hpf, "name"]), unique(chen[zga_nascent.9hpf, "name"])), filename=NULL, output=TRUE,
+        category.names = c("Detected at 6hpf" , "Detected at 7hpf", "Detected at 8hpf", "Detected at 9hpf"))
+grid.draw(venn)
+```
+
+##Definition of dynamic groups
+```{r}
+Monly <- setdiff(setdiff(egg.detected, spermatid.detected), zga_nascent.detected)
+Zonly <- setdiff(setdiff(zga_nascent.detected, egg.detected), spermatid.detected)
+Ponly <-  setdiff(setdiff(spermatid.detected, zga_nascent.detected), egg.detected)
+MZonly <- setdiff(intersect(egg.detected, zga_nascent.detected), spermatid.detected)
+MPonly <- setdiff(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
+PZonly <- setdiff(intersect(spermatid.detected, zga_nascent.detected), egg.detected)
+MPZ <- intersect(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
+ND <- setdiff(setdiff(setdiff(rna_genes, egg.detected), spermatid.detected), zga_nascent.detected)
+
+#MO <- setdiff(egg.detected, zga_nascent.detected)
+#ZO <- setdiff(zga_nascent.detected, egg.detected)
+#MZ <- intersect(egg.detected, zga_nascent.detected)
+
+rna_dyns <- list("Monly" = Monly, "Ponly" = Ponly, "Zonly" = Zonly, "MPonly" = MPonly, "MZonly" = MZonly, "PZonly" = PZonly, "MPZ"= MPZ, "ND"= ND)
+rna_dyns_sizes = unlist(lapply(rna_dyns, function(x) length(x)))
+```
+
+##Venn diagram of RNA dynamics
+```{r}
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", title="RNA dynamics",
+   names(rna_dyns[1:7]), fill=cols_rnadyns[names(rna_dyns)[1:7]], horiz=FALSE)
+
+library(eulerr)
+plot(euler(c("Egg"=length(Monly), "Spermatid"=length(Ponly), "ZGA"=length(Zonly),
+           "Egg&Spermatid"=length(MPonly), "Egg&ZGA"=length(MZonly), "Spermatid&ZGA"=length(PZonly), "Egg&Spermatid&ZGA"=length(MPZ))),
+     quantities = TRUE,fills=cols_rnadyns[names(rna_dyns)])
+plot(venn(c("Egg"=length(Monly), "Spermatid"=length(Ponly), "ZGA"=length(Zonly),
+           "Egg&Spermatid"=length(MPonly), "Egg&ZGA"=length(MZonly), "Spermatid&ZGA"=length(PZonly), "Egg&Spermatid&ZGA"=length(MPZ))),
+     quantities = TRUE,fills=cols_rnadyns[names(rna_dyns)])
+```
+###Combine and transform TPM data 
+```{r}
+hm_data.spermatid <- data.frame(Spermatid = rowMeans(cbind(teperek[,"GSM1944414"], teperek[,"GSM1944415"], teperek[,"GSM1944416"])))
+rownames(hm_data.spermatid) <- teperek[, "name"]
+hm_data.egg <- data.frame(Egg = rowMeans(cbind(chen[,"GSM6076970"], chen[,"GSM6076971"])))
+rownames(hm_data.egg) <- chen[, "name"]
+hm_data.zga <- data.frame(T6hpf = rowMeans(cbind(chen[,"GSM6076952"], chen[,"GSM6076953"])),# chen[,"GSM6076976"], chen[,"GSM6076977"])), 
+                     T7hpf = rowMeans(cbind(chen[,"GSM6076954"], chen[,"GSM6076955"])),# chen[,"GSM6076978"], chen[,"GSM6076979"])),
+                     T8hpf = rowMeans(cbind(chen[,"GSM6076956"], chen[,"GSM6076957"])),#, chen[,"GSM6076980"], chen[,"GSM6076981"])),
+                     T9hpf = rowMeans(cbind(chen[,"GSM6076958"], chen[,"GSM6076959"])))#, chen[,"GSM6076982"], chen[,"GSM6076983"])))
+rownames(hm_data.zga) <- chen[, "name"]
+
+zga_nascent.5hpf <- rowMeans(cbind(chen[,"GSM6076950"], chen[,"GSM6076951"]))#, chen[,"GSM6076974"], chen[,"GSM6076975"]))
+hm_data.zga <- apply(hm_data.zga, 2, function(x) x - zga_nascent.5hpf)
+hm_data.zga[hm_data.zga<0] <- 0
+
+tpms_ct <- merge(hm_data.spermatid, cbind(hm_data.egg, hm_data.zga), by = "row.names", all = TRUE)
+tpms_ct <- replace(tpms_ct, is.na(tpms_ct), 0)
+rownames(tpms_ct) <- tpms_ct$Row.names
+tpms_ct <- tpms_ct[ ,!(names(tpms_ct) %in% "Row.names")]
+
+for (rna_dyn in names(rna_dyns)){
+  tpms_ct[unlist(rna_dyns[rna_dyn]), "Category"] <- rna_dyn
+}
+tpms_ct$Category <- factor(tpms_ct$Category, levels = names(rna_dyns))
+```
+
+##Save data
+```{r}
+save(tpms_ct, rna_dyns, cols_rnadyns, file="rna_data.RData")
+```
+
+###RNA groups heatmap
+```{r, fig.width=6, fig.height=8}
+library(ComplexHeatmap)
+
+tpms_ct_no_nd <- tpms_ct[tpms_ct$Category!= "ND",]
+tpms_ct_no_nd$Category <- factor(tpms_ct_no_nd$Category, levels = names(rna_dyns)[1:7])
+hm_values.log <- as.matrix(log2(tpms_ct_no_nd[ ,1:6]+1))
+
+col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
+h1 <- Heatmap(hm_values.log, row_split = tpms_ct_no_nd$Category, name="log2(TPM+1)",
+               cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
+               col = cols_biscale, row_title_gp = gpar(cex=0.5), 
+                  left_annotation = rowAnnotation(
+                    Category = tpms_ct_no_nd$Category,
+                    col = list(Category = cols_rnadyns)))
+
+draw(h1)
+
+#pdf("~/Downloads/RNAGenegroups_Heatmap.pdf", width=4, height=8)
+#draw(h1)
+#dev.off()
+```
+###RNA groups boxplots
+```{r}
+library(tidyr)
+library(ggplot2)
+bp_data <- tpms_ct %>% pivot_longer(cols=c("Spermatid", "Egg", "T6hpf", "T7hpf", "T8hpf", "T9hpf"), names_to='Time', values_to='Expression')
+
+boxes <- ggplot(bp_data, aes(x=Time, y=log2(Expression+1), fill=Category)) + 
+  geom_boxplot() + 
+  scale_fill_brewer(palette="Dark2") +
+  theme_minimal() + 
+  labs(y = "log2(TPM+1)") +  
+  facet_wrap(~Category, scale="free", ncol = 4) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4")
+boxes
+#ggsave(boxes, file = "/Users/meghana.oak/Documents/EPIGRS_PhD/NGS_data_sorted/Plots/Fig2/iv_RNAGenegroups_Boxplots.tiff", width = 22, height = 12, units = "cm")
+```
+
+###GO analysis on each gene group
+```{r, fig.width=8, fig.height=12}
+library(clusterProfiler)
+library(org.Xl.eg.db)
+library(simplifyEnrichment)
+library(gridExtra)
+library(grid)
+Xl_ENTREZ <- read.delim("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/GenePageLaevisEntrezGeneUnigeneMapping.txt", header = FALSE)
+
+go_enrichment <- function(data) {
+  entrez <- Xl_ENTREZ[Xl_ENTREZ$V2 %in% data, ] 
+  colnames(entrez) <- c("Xenbase ID", "Gene symbol", "Entrez ID", "Xl ID unknown")
+  GO <- enrichGO(entrez$`Entrez ID`, OrgDb = org.Xl.eg.db, ont = "BP", readable = TRUE)
+  return(GO)
+}
+plot_go <- function(enrichGO, name){
+  dp <- dotplot(enrichGO)
+  cn <- cnetplot(enrichGO)
+  grid.arrange(dp, cn, top=name, nrow=2)
+}
+
+for (i in 1:length(rna_dyns)){
+  rna_GO <- go_enrichment(rna_dyns[[i]])
+  if(sum(rna_GO@result$p.adjust < rna_GO@pvalueCutoff)){
+    plot_go(rna_GO, names(rna_dyns)[i])
+  }
+}
+```
+
+```{r message=FALSE, warning=FALSE}
+for (i in 1:length(rna_dyns)){
+  enrichGO <- go_enrichment(rna_dyns[[i]])
+  hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
+  if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(rna_dyns[i]))}
+}
+```
+
+
+
+
+
+
+

@@ -1,0 +1,389 @@
+---
+title: "Meghana H3K4me3 Maintenance - 01 H3K4me3 analysis"
+output: html_notebook
+---
+
+##Colors
+```{r}
+library(pals)
+cols_chipdyns = setNames(polychrome(16), c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L", "H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L",
+"L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L", "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L"))
+```
+
+##Load genome and fasta (run for uncached binarization or peak calling data)
+```{r warning=FALSE}
+suppressPackageStartupMessages(library(AnnotationDbi))
+Xenla10.1_TxDb <- loadDb("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/Xenla10.1.sqlite")
+allgenes <- genes(Xenla10.1_TxDb)
+rm(Xenla10.1_TxDb)
+
+suppressPackageStartupMessages(library(Biostrings))
+Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
+chr <- names(Xenla10.1_fa[1:18, ])
+rm(Xenla10.1_fa)
+
+promoters <- promoters(allgenes, upstream = 0, downstream = 1)
+promoters_chr <- promoters[seqnames(promoters) %in% chr]
+```
+
+##Utility functions
+```{r}
+suppressPackageStartupMessages(library(EnrichedHeatmap))
+readGranges <- function(filename){
+  granges <- readRDS(filename)
+  suppressWarnings({granges <- resize(granges, 200)})
+  granges <- trim(granges)
+  granges_chr <- granges[seqnames(granges) %in% chr]
+}
+enrichment <- function(coverage, title){
+  coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
+  coverage <- log2(coverage+1)
+  hm <- EnrichedHeatmap(coverage, 
+                        name = "H3K4me3 enrichment",
+                        column_title = title,
+                        col = c("blue", "red"),
+                        axis_name = c("-1kb", "TSS", "+1kb"))
+  draw(hm)
+  return(enriched_score(coverage))
+}
+```
+
+##Load dataset: Spermatid H3K4me3 Teperek
+```{r message=FALSE, warning=FALSE}
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Realigned_published/H3K4me3_teperek/")
+
+#Load data
+H3K4me3_spermatid.cov1 <- readGranges("GSM1944497_ranges.rds")
+H3K4me3_spermatid.cov2 <- readGranges("GSM1944498_ranges.rds")
+H3K4me3_spermatid.cov3 <- readGranges("GSM1944499_ranges.rds")
+H3K4me3_spermatid.cov <- c(H3K4me3_spermatid.cov1, H3K4me3_spermatid.cov2, H3K4me3_spermatid.cov3)
+
+#Merged data
+H3K4me3_spermatid <- enrichment(H3K4me3_spermatid.cov, "Spermatid Merged Reps")
+
+#Individual replicates (optional)
+#H3K4me3_spermatid.rep1 <- enrichment(H3K4me3_spermatid.cov1, "Spermatid Rep1")
+#H3K4me3_spermatid.rep2 <- enrichment(H3K4me3_spermatid.cov2, "Spermatid Rep2")
+#H3K4me3_spermatid.rep3 <- enrichment(H3K4me3_spermatid.cov3, "Spermatid Rep3")
+
+rm(H3K4me3_spermatid.cov1, H3K4me3_spermatid.cov2, H3K4me3_spermatid.cov3, H3K4me3_spermatid.cov)
+print("Dataset: Spermatid H3K4me3 Teperek loaded")
+```
+
+##Load dataset: Sperm H3K4me3 Teperek
+```{r warning=FALSE}
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Realigned_published/H3K4me3_teperek/")
+
+#Load data
+H3K4me3_sperm.cov1 <- readGranges("GSM1944479_ranges.rds")
+H3K4me3_sperm.cov2 <- readGranges("GSM1944481_ranges.rds")
+H3K4me3_sperm.cov3 <- readGranges("GSM1944483_ranges.rds")
+H3K4me3_sperm.cov <- c(H3K4me3_sperm.cov1, H3K4me3_sperm.cov2, H3K4me3_sperm.cov3)
+
+#Merged data
+H3K4me3_sperm <- enrichment(H3K4me3_sperm.cov, "Sperm Merged Reps")
+
+#Individual replicates (optional)
+#H3K4me3_sperm.rep1 <- enrichment(H3K4me3_sperm.cov1, "Sperm Rep1")
+#H3K4me3_sperm.rep2 <- enrichment(H3K4me3_sperm.cov2, "Sperm Rep2")
+#H3K4me3_sperm.rep3 <- enrichment(H3K4me3_sperm.cov3, "Sperm Rep3")
+
+rm(H3K4me3_sperm.cov1, H3K4me3_sperm.cov2, H3K4me3_sperm.cov3, H3K4me3_sperm.cov)
+print("Dataset: Sperm H3K4me3 Teperek loaded")
+```
+
+##Load dataset: Sperm H3K4me3 Oikawa (alternative - don't run)
+```{r eval=FALSE, warning=FALSE, include=FALSE}
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/1_Sperm_H3K4me3_Oikawa_Xl10.1")
+
+#Load data
+#H3K4me3_sperm.cov1 <- readGranges("GSM3587294_ranges.rds")
+H3K4me3_sperm.cov2 <- readGranges("GSM3587295_ranges.rds")
+H3K4me3_sperm.cov3 <- readGranges("GSM3587296_ranges.rds")
+H3K4me3_sperm.cov <- c(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3)
+
+#Merged data
+H3K4me3_sperm <- enrichment(H3K4me3_sperm.cov, "Sperm Merged Reps")
+
+#Individual replicates (optional)
+#H3K4me3_sperm.rep1 <- enrichment(H3K4me3_sperm.cov1, "Sperm Rep1")
+#H3K4me3_sperm.rep2 <- enrichment(H3K4me3_sperm.cov2, "Sperm Rep2")
+#H3K4me3_sperm.rep3 <- enrichment(H3K4me3_sperm.cov3, "Sperm Rep3")
+
+rm(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3, H3K4me3_sperm.cov)
+print("Dataset: Sperm H3K4me3 Oikawa loaded")
+```
+
+##Load dataset: Pre-ZGA (256c) H3K4me3 Eva/Oikawa
+```{r warning=FALSE}
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/3_256c_H3K4me3_Eva-Oikawa_Xl10.1")
+
+#IP coverage replicates
+H3K4me3_prezga.cov1 <- readRDS("GSM3671368_ranges.rds")
+H3K4me3_prezga.cov2 <- readRDS("GSM3671369_ranges.rds")
+H3K4me3_prezga.cov <- c(H3K4me3_prezga.cov1, H3K4me3_prezga.cov2)
+
+#Merged data
+H3K4me3_prezga <- enrichment(H3K4me3_prezga.cov, "256c Merged Reps")
+
+#Individual replicates (optional)
+#H3K4me3_prezga.rep1 <- enrichment(H3K4me3_prezga.cov1, "256c Rep1")
+#H3K4me3_prezga.rep2 <- enrichment(H3K4me3_prezga.cov2, "256c Rep2")
+
+rm(H3K4me3_prezga.cov1, H3K4me3_prezga.cov2, H3K4me3_prezga.cov)
+print("Pre-ZGA (256c) H3K4me3 Eva/Oikawa loaded")
+```
+
+##Load dataset: ZGA (St10.5) H3K4me3 Session
+```{r warning=FALSE}
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/6_St10.5_H3K4me3_Session_Xl10.1/GSE76059")
+
+#IP coverage replicates
+H3K4me3_zga.cov1 <- readRDS("GSM1973491_ranges.rds")
+H3K4me3_zga.cov2 <- readRDS("GSM1973492_ranges.rds")
+H3K4me3_zga.cov <- c(H3K4me3_zga.cov1, H3K4me3_zga.cov2)
+
+#Merged data
+H3K4me3_zga <- enrichment(H3K4me3_zga.cov, "St10.5 Merged Reps")
+
+#Individual replicates (optional)
+#H3K4me3_zga.rep1 <- enrichment(H3K4me3_zga.cov1, "St10.5 Rep1")
+#H3K4me3_zga.rep2 <- enrichment(H3K4me3_zga.cov2, "St10.5 Rep2")
+
+rm(H3K4me3_zga.cov1, H3K4me3_zga.cov2, H3K4me3_zga.cov)
+print("ZGA (St10.5) H3K4me3 Session loaded")
+```
+
+```{r}
+#Save data
+save(H3K4me3_spermatid, H3K4me3_sperm, H3K4me3_prezga, H3K4me3_zga, 
+     file="~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/h3k4me3_data_log.RData")
+```
+
+```{r}
+#Load data (run from here)
+load("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/h3k4me3_data_log.RData")
+```
+
+```{r}
+#Binarization
+library(plotGMM)
+library(mixtools)
+set.seed(12)
+binarize_bimodal <- function(data, title) {
+  data <- data[,1]
+  em_data <-  normalmixEM(data, k = 2)
+  cut_off <- plot_cut_point(em_data, plot = FALSE)
+  plot(plot_cut_point(em_data, plot = TRUE, color = "amerika"))
+  binarized = data>=cut_off[1]
+  return(binarized)
+}
+
+H3K4me3_spermatid.binarized = binarize_bimodal(H3K4me3_spermatid, "Spermatid")
+H3K4me3_sperm.binarized = binarize_bimodal(H3K4me3_sperm, "Sperm")
+H3K4me3_prezga.binarized = binarize_bimodal(H3K4me3_prezga, "256c")
+H3K4me3_zga.binarized = binarize_bimodal(H3K4me3_zga, "St10.5")
+```
+
+
+## Load peak calling data (alternative to everything above)
+```{r message=FALSE, warning=FALSE}
+library(rtracklayer)
+library(ggpubr)
+#Load bed files for spermatid, sperm, pre-ZGA, post-ZGA
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/8_Sperm-spermatid_H3K4me3_Teperek_Xl10.1")
+D0_bed1 <- import("GSM1944497.bed", format = "bed")
+D0_bed2 <- import("GSM1944498.bed", format = "bed")
+D0_bed3 <- import("GSM1944499.bed", format = "bed")
+D0_spdH3K4me3_bed <- c(D0_bed1, D0_bed2, D0_bed3)
+
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/1_Sperm_H3K4me3_Oikawa_Xl10.1")
+D1_bed2 <- import("GSM3587295.bed", format = "bed")
+D1_bed3 <- import("GSM3587296.bed", format = "bed")
+D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
+
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/3_256c_H3K4me3_Eva-Oikawa_Xl10.1")
+D3_bed1 <- import("H3K4me3_IP1_GSM3671368.bed", format = "bed")
+D3_bed2 <- import("H3K4me3_IP2_GSM3671369.bed", format = "bed")
+D3_S7H3K4me3_bed <- c(D3_bed1, D3_bed2)
+
+setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/6_St10.5_H3K4me3_Session_Xl10.1/GSE76059")
+D6_bed1 <- import("GSM1973491.bed", format = "bed")
+D6_bed2 <- import("GSM1973492.bed", format = "bed")
+D6_S10H3K4me3_bed <- c(D6_bed1, D6_bed2)
+
+rm(D0_bed1, D0_bed2, D0_bed3, D1_bed2, D1_bed3, D3_bed1, D3_bed2, D6_bed1, D6_bed2)
+
+promoters_1kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
+promoters_chr_1kb <- promoters_1kb[seqnames(promoters_1kb) %in% chr]
+h3k4stages <- list(D0_spdH3K4me3_bed, D1_spH3K4me3_bed, D3_S7H3K4me3_bed, D6_S10H3K4me3_bed)
+h3k4prostages <- lapply(h3k4stages, function(x){promoters_chr_1kb$gene_id[findOverlaps(promoters_chr_1kb, x, select = "first") != "NA"]})
+names(h3k4prostages) <- c("Spermatid", "Sperm", "Pre-ZGA", "ZGA")
+
+genes <- rownames(H3K4me3_sperm)
+H3K4me3_spermatid.binarized = genes %in% h3k4prostages[["Spermatid"]]
+H3K4me3_sperm.binarized = genes %in% h3k4prostages[["Sperm"]]
+H3K4me3_prezga.binarized = genes %in% h3k4prostages[["Pre-ZGA"]]
+H3K4me3_zga.binarized = genes %in% h3k4prostages[["ZGA"]]
+```
+
+```{r}
+#Definition of dynamic groups
+genes <- rownames(H3K4me3_sperm)
+L_H_H_H = genes[!H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #0-1-1-1
+L_H_H_L = genes[!H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #0-1-1-0
+L_H_L_H = genes[!H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #0-1-0-1
+L_H_L_L = genes[!H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #0-1-0-0
+L_L_H_H = genes[!H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #0-0-1-1
+L_L_H_L = genes[!H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #0-0-1-0
+L_L_L_H = genes[!H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #0-0-0-1
+L_L_L_L = genes[!H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #0-0-0-0
+
+H_H_H_H = genes[H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #1-1-1-1
+H_H_H_L = genes[H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #1-1-1-0
+H_H_L_H = genes[H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #1-1-0-1
+H_H_L_L = genes[H3K4me3_spermatid.binarized & H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #1-1-0-0
+H_L_H_H = genes[H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #1-0-1-1
+H_L_H_L = genes[H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #1-0-1-0
+H_L_L_H = genes[H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & H3K4me3_zga.binarized] #1-0-0-1
+H_L_L_L = genes[H3K4me3_spermatid.binarized & !H3K4me3_sperm.binarized & !H3K4me3_prezga.binarized & !H3K4me3_zga.binarized] #1-0-0-0
+
+chip_dyns <- setNames(list(H_H_H_H, H_H_H_L, H_H_L_H, H_H_L_L, H_L_H_H, H_L_H_L, H_L_L_H, H_L_L_L,
+L_H_H_H, L_H_H_L, L_H_L_H, L_H_L_L, L_L_H_H, L_L_H_L, L_L_L_H, L_L_L_L), names(cols_chipdyns))
+chip_dyns_sizes = unlist(lapply(chip_dyns, function(x) length(x)))
+```
+
+## Save data
+```{r}
+save(chip_dyns, cols_chipdyns, file="chip_data_peaks.RData")
+#save(chip_dyns, cols_chipdyns, file="chip_data_bin.RData")
+```
+
+## Plot legend
+```{r fig.height=6, fig.width=3}
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", title="H3K4me3 dynamics",
+   names(chip_dyns[1:15]), fill=cols_chipdyns[names(chip_dyns)[1:15]], horiz=FALSE)
+```
+
+##Venn diagram of H3K4me3 dynamics
+```{r}
+library(eulerr)
+plot(euler(c("Spermatid"=length(H_L_L_L), "Sperm"=length(L_H_L_L), "Pre-ZGA"=length(L_L_H_L), "ZGA"=length(L_L_L_H),
+           "Spermatid&Sperm"=length(H_H_L_L), "Spermatid&Pre-ZGA"=length(H_L_H_L), "Spermatid&ZGA"=length(H_L_L_H),
+           "Sperm&Pre-ZGA"=length(L_H_H_L), "Sperm&ZGA"=length(L_H_L_H), "Pre-ZGA&ZGA"=length(L_L_H_H),
+      "Spermatid&Sperm&Pre-ZGA"=length(H_H_H_L), "Spermatid&Sperm&ZGA"=length(H_H_L_H), "Spermatid&Pre-ZGA&ZGA"=length(H_L_H_H),
+      "Sperm&Pre-ZGA&ZGA"=length(L_H_H_H), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(H_H_H_H))),
+     quantities = TRUE,  fills=cols_chipdyns[c("H_L_L_L", "L_H_L_L", "L_L_H_L", "L_L_L_H", "H_H_L_L", "H_L_H_L", "H_L_L_H", "L_H_H_L", "L_H_L_H", "L_L_H_H", "H_H_H_L", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H")])
+
+plot(venn(c("Spermatid"=length(H_L_L_L), "Sperm"=length(L_H_L_L), "Pre-ZGA"=length(L_L_H_L), "ZGA"=length(L_L_L_H),
+           "Spermatid&Sperm"=length(H_H_L_L), "Spermatid&Pre-ZGA"=length(H_L_H_L), "Spermatid&ZGA"=length(H_L_L_H),
+           "Sperm&Pre-ZGA"=length(L_H_H_L), "Sperm&ZGA"=length(L_H_L_H), "Pre-ZGA&ZGA"=length(L_L_H_H),
+      "Spermatid&Sperm&Pre-ZGA"=length(H_H_H_L), "Spermatid&Sperm&ZGA"=length(H_H_L_H), "Spermatid&Pre-ZGA&ZGA"=length(H_L_H_H),
+      "Sperm&Pre-ZGA&ZGA"=length(L_H_H_H), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(H_H_H_H))),
+     quantities = TRUE,  fills=cols_chipdyns[c("H_L_L_L", "L_H_L_L", "L_L_H_L", "L_L_L_H", "H_H_L_L", "H_L_H_L", "H_L_L_H", "L_H_H_L", "L_H_L_H", "L_L_H_H", "H_H_H_L", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H")])
+```
+
+```{r}
+#Heatmap
+hm_data <- cbind(H3K4me3_spermatid, H3K4me3_sperm, H3K4me3_prezga, H3K4me3_zga, NA)
+colnames(hm_data) <- c("Spermatid", "Sperm", "256c", "St10.5", "Dynamics")
+hm_data[L_H_H_H, "Dynamics"] <- "0-1-1-1"
+hm_data[L_H_H_L, "Dynamics"] <- "0-1-1-0"
+hm_data[L_H_L_H, "Dynamics"] <- "0-1-0-1"
+hm_data[L_H_L_L, "Dynamics"] <- "0-1-0-0"
+hm_data[L_L_H_H, "Dynamics"] <- "0-0-1-1"
+hm_data[L_L_H_L, "Dynamics"] <- "0-0-1-0"
+hm_data[L_L_L_H, "Dynamics"] <- "0-0-0-1"
+hm_data[L_L_L_L, "Dynamics"] <- "0-0-0-0"
+
+hm_data[H_H_H_H, "Dynamics"] <- "1-1-1-1"
+hm_data[H_H_H_L, "Dynamics"] <- "1-1-1-0"
+hm_data[H_H_L_H, "Dynamics"] <- "1-1-0-1"
+hm_data[H_H_L_L, "Dynamics"] <- "1-1-0-0"
+hm_data[H_L_H_H, "Dynamics"] <- "1-0-1-1"
+hm_data[H_L_H_L, "Dynamics"] <- "1-0-1-0"
+hm_data[H_L_L_H, "Dynamics"] <- "1-0-0-1"
+hm_data[H_L_L_L, "Dynamics"] <- "1-0-0-0"
+hm_data$Dynamics <- as.factor(hm_data$Dynamics)
+
+
+library(ComplexHeatmap)
+library(circlize)
+col_fun = colorRamp2(c(0,100), c("blue", "red"))
+#Heatmap(hm_data[1:4], name = "H3K4me3 enrichment", column_title = "H3K4me3 dynamics groups", cluster_rows = FALSE, 
+#        show_row_names = FALSE, row_split = hm_data$Dynamics, row_title_rot = 0, col = col_fun)
+
+Heatmap(hm_data[1:4], name = "H3K4me3 enrichment", column_title = "H3K4me3 dynamics groups", cluster_rows = TRUE, 
+        show_row_names = FALSE, row_title_rot = 0, col = col_fun)
+```
+
+## Alluvial plots
+```{r}
+library(plyr)
+library(ggalluvial)
+library(dplyr)
+
+get_row <- function(chip_dyn){
+  levels = unlist(strsplit(names(chip_dyn), split = "_"))
+  return(c(levels, length(chip_dyn[[1]]), names(chip_dyn)))
+}
+plot_df = data.frame()
+for (i in 1:length(chip_dyns)){
+  row = get_row(chip_dyns[i])
+  plot_df = rbind(plot_df, row)
+}
+colnames(plot_df) <- c("Spermatid", "Sperm", "Pre-ZGA", "ZGA", "Freq", "Dynamic")
+plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
+
+plot_df <- plot_df[!plot_df$Dynamic %in% c("L_L_L_L", "H_H_H_H"),]
+cols_mod <- cols_chipdyns[!names(cols_chipdyns) %in% c("L_L_L_L", "H_H_H_H")]
+
+ggplot(plot_df,
+       aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
+  geom_alluvium(aes(fill = Dynamic), width = 1/12) + theme_pubr() +
+  geom_stratum(width = 1/12, fill = "grey", color = "black", alpha = .75) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
+  scale_fill_manual(values=cols_mod)
+```
+
+
+###GO analysis on each gene group
+```{r, fig.width=8, fig.height=12}
+library(clusterProfiler)
+library(org.Xl.eg.db)
+library(simplifyEnrichment)
+library(gridExtra)
+library(grid)
+Xl_ENTREZ <- read.delim("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/GenePageLaevisEntrezGeneUnigeneMapping.txt", header = FALSE)
+
+go_enrichment <- function(data) {
+  entrez <- Xl_ENTREZ[Xl_ENTREZ$V2 %in% data, ] 
+  colnames(entrez) <- c("Xenbase ID", "Gene symbol", "Entrez ID", "Xl ID unknown")
+  GO <- enrichGO(entrez$`Entrez ID`, OrgDb = org.Xl.eg.db, ont = "BP", readable = TRUE)
+  return(GO)
+}
+plot_go <- function(enrichGO, name){
+  dp <- dotplot(enrichGO)
+  cn <- cnetplot(enrichGO)
+  grid.arrange(dp, cn, top=name, nrow=2)
+}
+
+for (i in 1:length(chip_dyns)){
+  chip_GO <- go_enrichment(chip_dyns[[i]])
+  if(sum(chip_GO@result$p.adjust < chip_GO@pvalueCutoff)){
+    plot_go(chip_GO, names(chip_dyns)[i])
+  }
+}
+```
+
+
+```{r message=FALSE, warning=FALSE}
+for (i in 1:length(chip_dyns)){
+  enrichGO <- go_enrichment(chip_dyns[[i]])
+  hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
+  if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(chip_dyns[i]))}
+}
+```
+
