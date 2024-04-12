@@ -6,8 +6,7 @@ output: html_notebook
 ##Colors
 ```{r}
 library(pals)
-cols_chipdyns = setNames(polychrome(16), c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L", "H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L",
-"L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L", "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L"))
+cols_chipdyns <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L", "H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L", "L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L", "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L"))
 ```
 
 ##Load genome and fasta (run for uncached binarization or peak calling data)

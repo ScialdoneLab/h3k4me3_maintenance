@@ -81,7 +81,7 @@ MZonly <- setdiff(intersect(egg.detected, zga_nascent.detected), spermatid.detec
 MPonly <- setdiff(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
 PZonly <- setdiff(intersect(spermatid.detected, zga_nascent.detected), egg.detected)
 MPZ <- intersect(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
-ND <- setdiff(setdiff(setdiff(rna_genes, egg.detected), spermatid.detected), zga_nascent.detected)
+ND <- setdiff(setdiff(setdiff(allgenes$gene_id, egg.detected), spermatid.detected), zga_nascent.detected)
 
 #MO <- setdiff(egg.detected, zga_nascent.detected)
 #ZO <- setdiff(zga_nascent.detected, egg.detected)
