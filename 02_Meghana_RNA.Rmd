@@ -2,17 +2,19 @@
 title: "Meghana H3K4me3 Maintenance - 02 RNA-Seq analysis"
 output: html_notebook
 ---
-##Colors
+
+##Settings
 ```{r}
-cols_rnadyns = c(Monly="#1B9E77", Ponly="#D95F02", Zonly = "#7570B3", MPonly = "#E7298A", MZonly = "#66A61E", PZonly = "#E6AB02", MPZ = "#A6761D", ND = "#666666")
-cols_biscale <- c("lightgoldenrod1", "chocolate3", "firebrick4")
-vir_cols <- c("#fde725", "#5ec962", "#21918c", "#3b528b", "#440154")
+clustered_rna_groups = FALSE
+rna_clustering <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
+cols_rna_clusters <- c(GS="#1B9E77", GZ="#D95F02", ZS = "#7570B3", ND = "#666666")
 ```
 
 ## Load Teperek TPM
 ```{r warning=FALSE}
 detected_thr = 5
 library(Seurat)
+library(SummarizedExperiment)
 
 teperek_se <- readRDS("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_rnaseq/GSE75164/se.rds")
 teperek <- as.data.frame(assays(teperek_se)$tpms)
@@ -49,31 +51,15 @@ zga_nascent.detected <- unique(chen[zga_nascent.detected, "name"])
 
 ###Detected genes at each stage
 ```{r}
-rna_genes <- unique(union(chen$name, teperek$name))
+rna_genes <- intersect(unique(union(chen$name, teperek$name)), allgenes$gene_id)
 spermatid.detected <- spermatid.detected[spermatid.detected %in% rna_genes]
 egg.detected <- egg.detected[egg.detected %in% rna_genes]
 zga_nascent.detected <- zga_nascent.detected[zga_nascent.detected %in% rna_genes]
 ```
 
-###Venn diagram with all gene groups
-```{r}
-library(VennDiagram)
-grid.newpage()
-venn <- venn.diagram(
-        x = list(egg.detected, spermatid.detected, zga_nascent.detected), filename=NULL, output=TRUE,
-        category.names = c("Detected in Egg" , "Detected in\nSpermatid" , "Detected at ZGA (nascent)"))
-
-grid.draw(venn)
-
-grid.newpage()
-venn <- venn.diagram(
-        x = list(unique(chen[zga_nascent.6hpf, "name"]), unique(chen[zga_nascent.7hpf, "name"]), unique(chen[zga_nascent.8hpf, "name"]), unique(chen[zga_nascent.9hpf, "name"])), filename=NULL, output=TRUE,
-        category.names = c("Detected at 6hpf" , "Detected at 7hpf", "Detected at 8hpf", "Detected at 9hpf"))
-grid.draw(venn)
-```
-
 ##Definition of dynamic groups
 ```{r}
+rna_names_complete <- c("Monly", "Ponly", "Zonly", "MPonly", "MZonly", "PZonly", "MPZ", "ND")
 Monly <- setdiff(setdiff(egg.detected, spermatid.detected), zga_nascent.detected)
 Zonly <- setdiff(setdiff(zga_nascent.detected, egg.detected), spermatid.detected)
 Ponly <-  setdiff(setdiff(spermatid.detected, zga_nascent.detected), egg.detected)
@@ -83,13 +69,26 @@ PZonly <- setdiff(intersect(spermatid.detected, zga_nascent.detected), egg.detec
 MPZ <- intersect(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
 ND <- setdiff(setdiff(setdiff(allgenes$gene_id, egg.detected), spermatid.detected), zga_nascent.detected)
 
-#MO <- setdiff(egg.detected, zga_nascent.detected)
-#ZO <- setdiff(zga_nascent.detected, egg.detected)
-#MZ <- intersect(egg.detected, zga_nascent.detected)
+if(clustered_rna_groups){
+  rna_dyns <- lapply(rna_clustering, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
+  cols_rnadyns = cols_rna_clusters
+} else {
+  cols_rnadyns = c(Monly="#1B9E77", Ponly="#D95F02", Zonly = "#7570B3", MPonly = "#E7298A", MZonly = "#66A61E", PZonly = "#E6AB02", MPZ = "#A6761D", ND = "#666666")
+  rna_dyns <- list("Monly" = Monly, "Ponly" = Ponly, "Zonly" = Zonly, "MPonly" = MPonly, "MZonly" = MZonly, "PZonly" = PZonly, "MPZ"= MPZ, "ND"= ND)
+}
 
-rna_dyns <- list("Monly" = Monly, "Ponly" = Ponly, "Zonly" = Zonly, "MPonly" = MPonly, "MZonly" = MZonly, "PZonly" = PZonly, "MPZ"= MPZ, "ND"= ND)
 rna_dyns_sizes = unlist(lapply(rna_dyns, function(x) length(x)))
 ```
+
+## Save data
+```{r}
+if(clustered_rna_groups){
+  save(rna_dyns, cols_rnadyns, file="rna_data_clustered.RData")
+} else {
+  save(rna_dyns, cols_rnadyns, file="rna_data.RData")
+}
+```
+
 
 ##Venn diagram of RNA dynamics
 ```{r}
@@ -98,12 +97,23 @@ legend("topright", title="RNA dynamics",
    names(rna_dyns[1:7]), fill=cols_rnadyns[names(rna_dyns)[1:7]], horiz=FALSE)
 
 library(eulerr)
+if(clustered_rna_groups){
+  euler_cols <- setNames(rep("#d3d3d3", 8), rna_names_complete)
+  for(i in 1:length(rna_clustering)){
+    cluster <- rna_clustering[[i]]
+    for(dynamic in cluster){
+      euler_cols[dynamic]=cols_rnadyns[names(rna_clustering)[i]]
+    }
+  }
+} else {
+  euler_cols <- cols_rnadyns
+}
 plot(euler(c("Egg"=length(Monly), "Spermatid"=length(Ponly), "ZGA"=length(Zonly),
            "Egg&Spermatid"=length(MPonly), "Egg&ZGA"=length(MZonly), "Spermatid&ZGA"=length(PZonly), "Egg&Spermatid&ZGA"=length(MPZ))),
-     quantities = TRUE,fills=cols_rnadyns[names(rna_dyns)])
+     quantities = TRUE,fills=unlist(euler_cols))
 plot(venn(c("Egg"=length(Monly), "Spermatid"=length(Ponly), "ZGA"=length(Zonly),
            "Egg&Spermatid"=length(MPonly), "Egg&ZGA"=length(MZonly), "Spermatid&ZGA"=length(PZonly), "Egg&Spermatid&ZGA"=length(MPZ))),
-     quantities = TRUE,fills=cols_rnadyns[names(rna_dyns)])
+     quantities = TRUE,fills=unlist(euler_cols))
 ```
 ###Combine and transform TPM data 
 ```{r}
@@ -122,36 +132,34 @@ hm_data.zga <- apply(hm_data.zga, 2, function(x) x - zga_nascent.5hpf)
 hm_data.zga[hm_data.zga<0] <- 0
 
 tpms_ct <- merge(hm_data.spermatid, cbind(hm_data.egg, hm_data.zga), by = "row.names", all = TRUE)
-tpms_ct <- replace(tpms_ct, is.na(tpms_ct), 0)
 rownames(tpms_ct) <- tpms_ct$Row.names
-tpms_ct <- tpms_ct[ ,!(names(tpms_ct) %in% "Row.names")]
+tpms_ct <- tpms_ct[rownames(tpms_ct) %in% unlist(rna_dyns),!(names(tpms_ct) %in% "Row.names")]
 
 for (rna_dyn in names(rna_dyns)){
   tpms_ct[unlist(rna_dyns[rna_dyn]), "Category"] <- rna_dyn
 }
 tpms_ct$Category <- factor(tpms_ct$Category, levels = names(rna_dyns))
-```
-
-##Save data
-```{r}
-save(tpms_ct, rna_dyns, cols_rnadyns, file="rna_data.RData")
+tpms_ct <- replace(tpms_ct, is.na(tpms_ct), 0)
 ```
 
 ###RNA groups heatmap
 ```{r, fig.width=6, fig.height=8}
 library(ComplexHeatmap)
+cols_biscale <- c("lightgoldenrod1", "chocolate3", "firebrick4")
+remove_ND <- TRUE
 
-tpms_ct_no_nd <- tpms_ct[tpms_ct$Category!= "ND",]
-tpms_ct_no_nd$Category <- factor(tpms_ct_no_nd$Category, levels = names(rna_dyns)[1:7])
-hm_values.log <- as.matrix(log2(tpms_ct_no_nd[ ,1:6]+1))
+tpms_ct_plot <- tpms_ct
+if(remove_ND){tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND"),]}
+
+hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
 
 col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
-h1 <- Heatmap(hm_values.log, row_split = tpms_ct_no_nd$Category, name="log2(TPM+1)",
+h1 <- Heatmap(hm_values.log, row_split = tpms_ct_plot$Category, name="log2(TPM+1)",
                cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
                col = cols_biscale, row_title_gp = gpar(cex=0.5), 
                   left_annotation = rowAnnotation(
-                    Category = tpms_ct_no_nd$Category,
-                    col = list(Category = cols_rnadyns)))
+                    Category = tpms_ct_plot$Category,
+                    col = list(Category = unlist(cols_rnadyns))))
 
 draw(h1)
 
@@ -159,11 +167,17 @@ draw(h1)
 #draw(h1)
 #dev.off()
 ```
+
 ###RNA groups boxplots
 ```{r}
 library(tidyr)
 library(ggplot2)
-bp_data <- tpms_ct %>% pivot_longer(cols=c("Spermatid", "Egg", "T6hpf", "T7hpf", "T8hpf", "T9hpf"), names_to='Time', values_to='Expression')
+remove_ND <- FALSE
+
+tpms_ct_plot <- tpms_ct
+if(remove_ND){tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND"),]}
+bp_data <- tpms_ct_plot %>% pivot_longer(cols=c("Spermatid", "Egg", "T6hpf", "T7hpf", "T8hpf", "T9hpf"), names_to='Time', values_to='Expression')
+
 
 boxes <- ggplot(bp_data, aes(x=Time, y=log2(Expression+1), fill=Category)) + 
   geom_boxplot() + 
@@ -213,7 +227,6 @@ for (i in 1:length(rna_dyns)){
   if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(rna_dyns[i]))}
 }
 ```
-
 
 
 

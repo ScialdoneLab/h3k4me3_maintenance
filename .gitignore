@@ -1,3 +1,5 @@
 *.DS_Store
 *.nb.html
 *.RData
+.Rhistory
+*.log

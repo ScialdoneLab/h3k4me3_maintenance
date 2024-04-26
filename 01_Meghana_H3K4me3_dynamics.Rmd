@@ -1,0 +1,210 @@
+---
+title: "Meghana H3K4me3 Maintenance - 01 H3K4me3_dynamics"
+output: html_notebook
+---
+
+## Settings
+```{r}
+clustered_chip_groups <- FALSE
+chip_clustering <- list(Kept = "H_H_H_H", Recovered="H_H_L_H", Lost=c("H_H_H_L", "H_H_L_L"), Gained=c("L_L_H_H", "L_L_L_H"), Absent="L_L_L_L")
+#chip_clustering <- list(N_Y_ = "L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L"), Y_Y_ = c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L"), Y_N_ = c("H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L"), Absent="L_L_L_L"))
+
+load("h3k4me3_data_log.RData")
+```
+
+```{r}
+#Definition of dynamic groups
+chip_names_complete <- c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L", "H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L", "L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L", "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L")
+genes <- allgenes$gene_id
+L_H_H_H = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-1-1
+L_H_H_L = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-1-0
+L_H_L_H = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-0-1
+L_H_L_L = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-0-0
+L_L_H_H = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-1-1
+L_L_H_L = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-1-0
+L_L_L_H = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-0-1
+L_L_L_L = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-0-0
+
+H_H_H_H = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-1-1
+H_H_H_L = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-1-0
+H_H_L_H = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-0-1
+H_H_L_L = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-0-0
+H_L_H_H = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-1-1
+H_L_H_L = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-1-0
+H_L_L_H = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-0-1
+H_L_L_L = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-0-0
+
+if(clustered_chip_groups){
+  chip_dyns <- lapply(chip_clustering, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
+  cols_chipdyns <- setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_dyns))
+} else {
+  cols_chipdyns <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), chip_names_complete)
+  chip_dyns <- setNames(list(H_H_H_H, H_H_H_L, H_H_L_H, H_H_L_L, H_L_H_H, H_L_H_L, H_L_L_H, H_L_L_L,
+L_H_H_H, L_H_H_L, L_H_L_H, L_H_L_L, L_L_H_H, L_L_H_L, L_L_L_H, L_L_L_L), chip_names_complete)
+}
+chip_dyns_complete <- setNames(list(H_H_H_H, H_H_H_L, H_H_L_H, H_H_L_L, H_L_H_H, H_L_H_L, H_L_L_H, H_L_L_L,
+L_H_H_H, L_H_H_L, L_H_L_H, L_H_L_L, L_L_H_H, L_L_H_L, L_L_L_H, L_L_L_L), chip_names_complete)
+chip_dyns_sizes = unlist(lapply(chip_dyns, function(x) length(x)))
+```
+
+## Save data
+```{r}
+if(clustered_chip_groups){
+  save(chip_dyns, cols_chipdyns, file="chip_data_clustered.RData")
+} else {
+  save(chip_dyns, cols_chipdyns, file="chip_data.RData")
+}
+```
+
+## Plot legend
+```{r fig.height=6, fig.width=3}
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", title="H3K4me3 dynamics",
+#names(chip_dyns), fill=cols_chipdyns[names(chip_dyns)], horiz=FALSE)
+   names(chip_dyns[1:15]), fill=cols_chipdyns[names(chip_dyns)[1:15]], horiz=FALSE)
+```
+
+##Venn diagram of H3K4me3 dynamics
+```{r}
+library(eulerr)
+if(clustered_chip_groups){
+  euler_cols <- setNames(rep("#d3d3d3", 16), chip_names_complete)
+  for(i in 1:length(chip_clustering)){
+    cluster <- chip_clustering[[i]]
+    for(dynamic in cluster){
+      euler_cols[dynamic]=cols_chipdyns[names(chip_clustering)[i]]
+    }
+  }
+} else {
+  euler_cols <- cols_chipdyns
+}
+plot(euler(c("Spermatid"=length(H_L_L_L), "Sperm"=length(L_H_L_L), "Pre-ZGA"=length(L_L_H_L), "ZGA"=length(L_L_L_H),
+           "Spermatid&Sperm"=length(H_H_L_L), "Spermatid&Pre-ZGA"=length(H_L_H_L), "Spermatid&ZGA"=length(H_L_L_H),
+           "Sperm&Pre-ZGA"=length(L_H_H_L), "Sperm&ZGA"=length(L_H_L_H), "Pre-ZGA&ZGA"=length(L_L_H_H),
+      "Spermatid&Sperm&Pre-ZGA"=length(H_H_H_L), "Spermatid&Sperm&ZGA"=length(H_H_L_H), "Spermatid&Pre-ZGA&ZGA"=length(H_L_H_H),
+      "Sperm&Pre-ZGA&ZGA"=length(L_H_H_H), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(H_H_H_H))),
+     quantities = TRUE,  fills=euler_cols[c("H_L_L_L", "L_H_L_L", "L_L_H_L", "L_L_L_H", "H_H_L_L", "H_L_H_L", "H_L_L_H", "L_H_H_L", "L_H_L_H", "L_L_H_H", "H_H_H_L", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H")])
+
+plot(venn(c("Spermatid"=length(H_L_L_L), "Sperm"=length(L_H_L_L), "Pre-ZGA"=length(L_L_H_L), "ZGA"=length(L_L_L_H),
+           "Spermatid&Sperm"=length(H_H_L_L), "Spermatid&Pre-ZGA"=length(H_L_H_L), "Spermatid&ZGA"=length(H_L_L_H),
+           "Sperm&Pre-ZGA"=length(L_H_H_L), "Sperm&ZGA"=length(L_H_L_H), "Pre-ZGA&ZGA"=length(L_L_H_H),
+      "Spermatid&Sperm&Pre-ZGA"=length(H_H_H_L), "Spermatid&Sperm&ZGA"=length(H_H_L_H), "Spermatid&Pre-ZGA&ZGA"=length(H_L_H_H),
+      "Sperm&Pre-ZGA&ZGA"=length(L_H_H_H), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(H_H_H_H))),
+     quantities = TRUE,  fills=euler_cols[c("H_L_L_L", "L_H_L_L", "L_L_H_L", "L_L_L_H", "H_H_L_L", "H_L_H_L", "H_L_L_H", "L_H_H_L", "L_H_L_H", "L_L_H_H", "H_H_H_L", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H")])
+```
+
+
+
+## Alluvial plots
+```{r}
+library(plyr)
+library(ggalluvial)
+library(dplyr)
+
+remove_LLLL <- FALSE
+remove_HHHH <- FALSE
+
+get_row <- function(chip_dyn){
+  levels = unlist(strsplit(names(chip_dyn), split = "_"))
+  return(c(levels, length(chip_dyn[[1]]), names(chip_dyn)))
+}
+plot_df = data.frame()
+for (i in 1:length(chip_dyns_complete)){
+  row = get_row(chip_dyns_complete[i])
+  plot_df = rbind(plot_df, row)
+}
+#if(clustered_chip_groups){
+#  plot_df <- plot_df[plot_df[,ncol(plot_df)] %in% unlist(chip_clustering),]
+#}
+
+colnames(plot_df) <- c("Spermatid", "Sperm", "Pre-ZGA", "ZGA", "Freq", "Dynamic")
+plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
+
+if(remove_LLLL){plot_df <- plot_df[!plot_df$Dynamic %in% c("L_L_L_L"),]}
+if(remove_HHHH){plot_df <- plot_df[!plot_df$Dynamic %in% c("H_H_H_H"),]}
+
+ggplot(plot_df,
+       aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
+  geom_alluvium(aes(fill = Dynamic), width = 1/12) + theme_pubr() +
+  geom_stratum(width = 1/12, fill = "grey", color = "black", alpha = .75) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
+  scale_fill_manual(values=euler_cols)
+```
+
+
+###GO analysis on each gene group
+```{r, fig.width=8, fig.height=12}
+library(clusterProfiler)
+library(org.Xl.eg.db)
+library(simplifyEnrichment)
+library(gridExtra)
+library(grid)
+Xl_ENTREZ <- read.delim("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/GenePageLaevisEntrezGeneUnigeneMapping.txt", header = FALSE)
+
+go_enrichment <- function(data) {
+  entrez <- Xl_ENTREZ[Xl_ENTREZ$V2 %in% data, ] 
+  colnames(entrez) <- c("Xenbase ID", "Gene symbol", "Entrez ID", "Xl ID unknown")
+  GO <- enrichGO(entrez$`Entrez ID`, OrgDb = org.Xl.eg.db, ont = "BP", readable = TRUE)
+  return(GO)
+}
+plot_go <- function(enrichGO, name){
+  dp <- dotplot(enrichGO)
+  cn <- cnetplot(enrichGO)
+  grid.arrange(dp, cn, top=name, nrow=2)
+}
+
+for (i in 1:length(chip_dyns)){
+  chip_GO <- go_enrichment(chip_dyns[[i]])
+  if(sum(chip_GO@result$p.adjust < chip_GO@pvalueCutoff)){
+    plot_go(chip_GO, names(chip_dyns)[i])
+  }
+}
+```
+
+
+```{r message=FALSE, warning=FALSE}
+for (i in 1:length(chip_dyns)){
+  enrichGO <- go_enrichment(chip_dyns[[i]])
+  hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
+  if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(chip_dyns[i]))}
+}
+```
+
+#Differences in Maintenance at each transition
+```{r fig.height=5, fig.width=10}
+type = "peak.width"
+
+transition_diff <- function(prev_stage, next_stage, type="peak.width"){
+  genes_prev <- chip_dfs[[prev_stage]]$peak
+  genes_maintain <- chip_dfs[[next_stage]]$peak
+  plot_df <- data.frame(allgenes$gene_id[genes_prev], factor(genes_maintain[genes_prev], levels=c("FALSE","TRUE"),labels=c("Not maintained", "Maintained")),
+                                                                                    chip_dfs[[prev_stage]][genes_prev, type])
+  colnames(plot_df) <- c("Gene", "H3K4me3", type)
+  violin_plot <- ggviolin(plot_df, x = "H3K4me3", y = paste(type), fill = "H3K4me3",
+         add = "boxplot", add.params = list(fill = "white")) + stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(type, prev_stage))
+  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "H3K4me3") + xlab(paste(type, prev_stage))
+  grid.arrange(violin_plot, ecdf_plot, top=paste("Maintenance from", prev_stage, "to", next_stage), ncol=2)
+}
+
+transition_diff("Spermatid", "Sperm", type=type)
+transition_diff("Sperm", "Pre-ZGA",  type=type)
+transition_diff("Pre-ZGA", "ZGA",  type=type)
+transition_diff("Spermatid", "ZGA",  type=type)
+```
+
+
+```{r fig.height=5, fig.width=10}
+timepoint = "Sperm"
+type = "peak.width"
+
+label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
+plot_df <- chip_dfs[[timepoint]][chip_dfs[[timepoint]]$peak, ]
+plot_df$genes <- rownames(plot_df)
+plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns))
+violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
+         add = "boxplot", add.params = list(fill = "white")) #+ stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(type, prev_stage))
+ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn")
+grid.arrange(violin_plot, ecdf_plot, top=paste("Maintenance"), ncol=2)
+```
+
