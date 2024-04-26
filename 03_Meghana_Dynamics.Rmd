@@ -5,7 +5,7 @@ output: html_notebook
 
 ##Load categories
 ```{r}
-clustered_groups = TRUE
+clustered_groups = FALSE
 
 if(clustered_groups){
   load("rna_data_clustered.RData")
@@ -21,17 +21,17 @@ load("h3k4me3_data_log.RData")
 ```{r message=FALSE, warning=FALSE}
 library(ggpubr)
 
-remove_ND_LLLL <- FALSE
+remove_ND_NNNN <- FALSE
 
 rna_ordered <- rna_dyns
 chip_ordered <- chip_dyns
 if(!clustered_groups){
   rna_ordered <- rna_dyns[c("Monly", "Ponly", "MPonly", "MZonly", "PZonly", "MPZ", "Zonly", "ND")]
-  chip_ordered <- chip_dyns[c("H_L_L_L", "L_H_L_L",  "H_H_L_L", "H_L_H_L", "L_H_H_L", "H_H_H_L", "H_L_L_H", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H","L_H_L_H",  "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L")]
+  chip_ordered <- chip_dyns[c("Y_N_N_N", "N_Y_N_N",  "Y_Y_N_N", "Y_N_Y_N", "N_Y_Y_N", "Y_Y_Y_N", "Y_N_N_Y", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y","N_Y_N_Y",  "N_N_Y_Y", "N_N_Y_N", "N_N_N_Y", "N_N_N_N")]
 }
-if(remove_ND_LLLL){
+if(remove_ND_NNNN){
   rna_ordered <- rna_ordered[!names(rna_ordered) %in% c("ND")]
-  chip_ordered <- chip_ordered[!names(chip_ordered) %in% c("L_L_L_L", "Absent")]
+  chip_ordered <- chip_ordered[!names(chip_ordered) %in% c("N_N_N_N", "Absent")]
 }
 
 genesAbsolute <- lapply(chip_ordered, function(x){as.data.frame(lapply(rna_ordered, function(y){length(intersect(x, y))}))})
@@ -67,7 +67,7 @@ p_mat = -log10(p_mat)
 
 p_mat[p_mat < (-log10(0.05))] <- NA
 #p_mat <- p_mat[rowSums(is.na(p_mat)) != ncol(p_mat), ] # remove empty rows
-#p_mat <- p_mat[!rownames(p_mat) %in% c("L_L_L_L", "Absent"), colnames(p_mat) != "ND"] # not-detected does not mean not expressed (very uncertain sets)
+#p_mat <- p_mat[!rownames(p_mat) %in% c("N_N_N_N", "Absent"), colnames(p_mat) != "ND"] # not-detected does not mean not expressed (very uncertain sets)
 
 my_cols <- c("#6A00A8FF", "#FCA636FF", "#F0F921FF", "#F0F921FF")
 ggballoonplot(p_mat, fill="value") +
@@ -76,7 +76,8 @@ ggballoonplot(p_mat, fill="value") +
 ```
 
 # Peak shape comparison
-```{r fig.height=6, fig.width=8}
+```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+library(reshape2)
 dyn = rna_dyns
 cols = cols_rnadyns
 
@@ -121,7 +122,7 @@ ggecdf(data=plot_df, x=paste(type), color = "Stage")
 ```
 
 #Differences in Chip groups
-```{r fig.height=8, fig.width=8}
+```{r fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
 label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
 
 ## Chip dyns

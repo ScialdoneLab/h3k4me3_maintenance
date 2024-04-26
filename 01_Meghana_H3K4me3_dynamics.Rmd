@@ -6,44 +6,44 @@ output: html_notebook
 ## Settings
 ```{r}
 clustered_chip_groups <- FALSE
-chip_clustering <- list(Kept = "H_H_H_H", Recovered="H_H_L_H", Lost=c("H_H_H_L", "H_H_L_L"), Gained=c("L_L_H_H", "L_L_L_H"), Absent="L_L_L_L")
-#chip_clustering <- list(N_Y_ = "L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L"), Y_Y_ = c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L"), Y_N_ = c("H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L"), Absent="L_L_L_L"))
+chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered="Y_Y_N_Y", Nost=c("Y_Y_Y_N", "Y_Y_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+#chip_clustering <- list(N_Y_ = "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"), Y_Y_ = c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N"), Y_N_ = c("Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N"), Absent="N_N_N_N"))
 
 load("h3k4me3_data_log.RData")
 ```
 
 ```{r}
 #Definition of dynamic groups
-chip_names_complete <- c("H_H_H_H", "H_H_H_L", "H_H_L_H", "H_H_L_L", "H_L_H_H", "H_L_H_L", "H_L_L_H", "H_L_L_L", "L_H_H_H", "L_H_H_L", "L_H_L_H", "L_H_L_L", "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L")
+chip_names_complete <- c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N", "Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N", "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N", "N_N_Y_Y", "N_N_Y_N", "N_N_N_Y", "N_N_N_N")
 genes <- allgenes$gene_id
-L_H_H_H = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-1-1
-L_H_H_L = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-1-0
-L_H_L_H = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-0-1
-L_H_L_L = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-0-0
-L_L_H_H = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-1-1
-L_L_H_L = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-1-0
-L_L_L_H = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-0-1
-L_L_L_L = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-0-0
+N_Y_Y_Y = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-1-1
+N_Y_Y_N = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-1-0
+N_Y_N_Y = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-0-1
+N_Y_N_N = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-0-0
+N_N_Y_Y = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-1-1
+N_N_Y_N = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-1-0
+N_N_N_Y = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-0-1
+N_N_N_N = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-0-0
 
-H_H_H_H = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-1-1
-H_H_H_L = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-1-0
-H_H_L_H = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-0-1
-H_H_L_L = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-0-0
-H_L_H_H = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-1-1
-H_L_H_L = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-1-0
-H_L_L_H = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-0-1
-H_L_L_L = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-0-0
+Y_Y_Y_Y = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-1-1
+Y_Y_Y_N = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-1-0
+Y_Y_N_Y = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-0-1
+Y_Y_N_N = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-0-0
+Y_N_Y_Y = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-1-1
+Y_N_Y_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-1-0
+Y_N_N_Y = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-0-1
+Y_N_N_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-0-0
 
 if(clustered_chip_groups){
   chip_dyns <- lapply(chip_clustering, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
   cols_chipdyns <- setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_dyns))
 } else {
   cols_chipdyns <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), chip_names_complete)
-  chip_dyns <- setNames(list(H_H_H_H, H_H_H_L, H_H_L_H, H_H_L_L, H_L_H_H, H_L_H_L, H_L_L_H, H_L_L_L,
-L_H_H_H, L_H_H_L, L_H_L_H, L_H_L_L, L_L_H_H, L_L_H_L, L_L_L_H, L_L_L_L), chip_names_complete)
+  chip_dyns <- setNames(list(Y_Y_Y_Y, Y_Y_Y_N, Y_Y_N_Y, Y_Y_N_N, Y_N_Y_Y, Y_N_Y_N, Y_N_N_Y, Y_N_N_N,
+N_Y_Y_Y, N_Y_Y_N, N_Y_N_Y, N_Y_N_N, N_N_Y_Y, N_N_Y_N, N_N_N_Y, N_N_N_N), chip_names_complete)
 }
-chip_dyns_complete <- setNames(list(H_H_H_H, H_H_H_L, H_H_L_H, H_H_L_L, H_L_H_H, H_L_H_L, H_L_L_H, H_L_L_L,
-L_H_H_H, L_H_H_L, L_H_L_H, L_H_L_L, L_L_H_H, L_L_H_L, L_L_L_H, L_L_L_L), chip_names_complete)
+chip_dyns_complete <- setNames(list(Y_Y_Y_Y, Y_Y_Y_N, Y_Y_N_Y, Y_Y_N_N, Y_N_Y_Y, Y_N_Y_N, Y_N_N_Y, Y_N_N_N,
+N_Y_Y_Y, N_Y_Y_N, N_Y_N_Y, N_Y_N_N, N_N_Y_Y, N_N_Y_N, N_N_N_Y, N_N_N_N), chip_names_complete)
 chip_dyns_sizes = unlist(lapply(chip_dyns, function(x) length(x)))
 ```
 
@@ -78,31 +78,32 @@ if(clustered_chip_groups){
 } else {
   euler_cols <- cols_chipdyns
 }
-plot(euler(c("Spermatid"=length(H_L_L_L), "Sperm"=length(L_H_L_L), "Pre-ZGA"=length(L_L_H_L), "ZGA"=length(L_L_L_H),
-           "Spermatid&Sperm"=length(H_H_L_L), "Spermatid&Pre-ZGA"=length(H_L_H_L), "Spermatid&ZGA"=length(H_L_L_H),
-           "Sperm&Pre-ZGA"=length(L_H_H_L), "Sperm&ZGA"=length(L_H_L_H), "Pre-ZGA&ZGA"=length(L_L_H_H),
-      "Spermatid&Sperm&Pre-ZGA"=length(H_H_H_L), "Spermatid&Sperm&ZGA"=length(H_H_L_H), "Spermatid&Pre-ZGA&ZGA"=length(H_L_H_H),
-      "Sperm&Pre-ZGA&ZGA"=length(L_H_H_H), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(H_H_H_H))),
-     quantities = TRUE,  fills=euler_cols[c("H_L_L_L", "L_H_L_L", "L_L_H_L", "L_L_L_H", "H_H_L_L", "H_L_H_L", "H_L_L_H", "L_H_H_L", "L_H_L_H", "L_L_H_H", "H_H_H_L", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H")])
+plot(euler(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
+           "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
+           "Sperm&Pre-ZGA"=length(N_Y_Y_N), "Sperm&ZGA"=length(N_Y_N_Y), "Pre-ZGA&ZGA"=length(N_N_Y_Y),
+      "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
+      "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
+     quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
 
-plot(venn(c("Spermatid"=length(H_L_L_L), "Sperm"=length(L_H_L_L), "Pre-ZGA"=length(L_L_H_L), "ZGA"=length(L_L_L_H),
-           "Spermatid&Sperm"=length(H_H_L_L), "Spermatid&Pre-ZGA"=length(H_L_H_L), "Spermatid&ZGA"=length(H_L_L_H),
-           "Sperm&Pre-ZGA"=length(L_H_H_L), "Sperm&ZGA"=length(L_H_L_H), "Pre-ZGA&ZGA"=length(L_L_H_H),
-      "Spermatid&Sperm&Pre-ZGA"=length(H_H_H_L), "Spermatid&Sperm&ZGA"=length(H_H_L_H), "Spermatid&Pre-ZGA&ZGA"=length(H_L_H_H),
-      "Sperm&Pre-ZGA&ZGA"=length(L_H_H_H), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(H_H_H_H))),
-     quantities = TRUE,  fills=euler_cols[c("H_L_L_L", "L_H_L_L", "L_L_H_L", "L_L_L_H", "H_H_L_L", "H_L_H_L", "H_L_L_H", "L_H_H_L", "L_H_L_H", "L_L_H_H", "H_H_H_L", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H")])
+plot(venn(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
+           "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
+           "Sperm&Pre-ZGA"=length(N_Y_Y_N), "Sperm&ZGA"=length(N_Y_N_Y), "Pre-ZGA&ZGA"=length(N_N_Y_Y),
+      "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
+      "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
+     quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
 ```
 
 
 
 ## Alluvial plots
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(plyr)
 library(ggalluvial)
 library(dplyr)
+library(ggpubr)
 
-remove_LLLL <- FALSE
-remove_HHHH <- FALSE
+remove_NNNN <- FALSE
+remove_YYYY <- FALSE
 
 get_row <- function(chip_dyn){
   levels = unlist(strsplit(names(chip_dyn), split = "_"))
@@ -120,8 +121,8 @@ for (i in 1:length(chip_dyns_complete)){
 colnames(plot_df) <- c("Spermatid", "Sperm", "Pre-ZGA", "ZGA", "Freq", "Dynamic")
 plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
 
-if(remove_LLLL){plot_df <- plot_df[!plot_df$Dynamic %in% c("L_L_L_L"),]}
-if(remove_HHHH){plot_df <- plot_df[!plot_df$Dynamic %in% c("H_H_H_H"),]}
+if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
+if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
 
 ggplot(plot_df,
        aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
@@ -134,7 +135,7 @@ ggplot(plot_df,
 
 
 ###GO analysis on each gene group
-```{r, fig.width=8, fig.height=12}
+```{r fig.height=12, fig.width=8, message=FALSE, warning=FALSE}
 library(clusterProfiler)
 library(org.Xl.eg.db)
 library(simplifyEnrichment)
