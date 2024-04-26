@@ -5,13 +5,13 @@ output: html_notebook
 
 ##Settings
 ```{r}
-clustered_rna_groups = FALSE
+clustered_rna_groups = TRUE
 rna_clustering <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
 cols_rna_clusters <- c(GS="#1B9E77", GZ="#D95F02", ZS = "#7570B3", ND = "#666666")
 ```
 
 ## Load Teperek TPM
-```{r warning=FALSE}
+```{r message=FALSE, warning=FALSE}
 detected_thr = 5
 library(Seurat)
 library(SummarizedExperiment)
@@ -92,9 +92,14 @@ if(clustered_rna_groups){
 
 ##Venn diagram of RNA dynamics
 ```{r}
+remove_ND <- TRUE
+
+groups <- names(rna_dyns)
+if(remove_ND){groups <- groups[!groups %in% c("ND")]}
+
 plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
 legend("topright", title="RNA dynamics",
-   names(rna_dyns[1:7]), fill=cols_rnadyns[names(rna_dyns)[1:7]], horiz=FALSE)
+   groups, fill=cols_rnadyns[groups], horiz=FALSE)
 
 library(eulerr)
 if(clustered_rna_groups){
@@ -181,7 +186,7 @@ bp_data <- tpms_ct_plot %>% pivot_longer(cols=c("Spermatid", "Egg", "T6hpf", "T7
 
 boxes <- ggplot(bp_data, aes(x=Time, y=log2(Expression+1), fill=Category)) + 
   geom_boxplot() + 
-  scale_fill_brewer(palette="Dark2") +
+  scale_fill_manual(values=cols_rnadyns) +
   theme_minimal() + 
   labs(y = "log2(TPM+1)") +  
   facet_wrap(~Category, scale="free", ncol = 4) +
@@ -227,7 +232,13 @@ for (i in 1:length(rna_dyns)){
   if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(rna_dyns[i]))}
 }
 ```
-
+```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
+p_adj = 0.01
+go_list <- lapply(rna_dyns, go_enrichment)
+go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
+go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
+simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
+```
 
 
 

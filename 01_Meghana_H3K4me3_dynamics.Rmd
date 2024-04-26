@@ -58,10 +58,14 @@ if(clustered_chip_groups){
 
 ## Plot legend
 ```{r fig.height=6, fig.width=3}
+remove_NNNN <- FALSE
+
+groups <- names(chip_dyns)
+if(remove_NNNN){groups <- groups[!groups %in% c("N_N_N_N", "Absent")]}
+
 plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
 legend("topright", title="H3K4me3 dynamics",
-#names(chip_dyns), fill=cols_chipdyns[names(chip_dyns)], horiz=FALSE)
-   names(chip_dyns[1:15]), fill=cols_chipdyns[names(chip_dyns)[1:15]], horiz=FALSE)
+groups, fill=cols_chipdyns[groups], horiz=FALSE)
 ```
 
 ##Venn diagram of H3K4me3 dynamics
@@ -118,11 +122,15 @@ for (i in 1:length(chip_dyns_complete)){
 #  plot_df <- plot_df[plot_df[,ncol(plot_df)] %in% unlist(chip_clustering),]
 #}
 
-colnames(plot_df) <- c("Spermatid", "Sperm", "Pre-ZGA", "ZGA", "Freq", "Dynamic")
+colnames(plot_df) <- c(stages, "Freq", "Dynamic")
 plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
 
 if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
 if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
+
+for(stage in stages){
+  plot_df[,stage] <- factor(plot_df[,stage], levels=c("Y", "N"))
+}
 
 ggplot(plot_df,
        aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
@@ -171,10 +179,17 @@ for (i in 1:length(chip_dyns)){
   if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(chip_dyns[i]))}
 }
 ```
+```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
+p_adj = 0.01
+go_list <- lapply(chip_dyns, go_enrichment)
+go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
+go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
+simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
+```
 
 #Differences in Maintenance at each transition
 ```{r fig.height=5, fig.width=10}
-type = "peak.width"
+type = "promoter.max"
 
 transition_diff <- function(prev_stage, next_stage, type="peak.width"){
   genes_prev <- chip_dfs[[prev_stage]]$peak
@@ -196,16 +211,39 @@ transition_diff("Spermatid", "ZGA",  type=type)
 
 
 ```{r fig.height=5, fig.width=10}
-timepoint = "Sperm"
-type = "peak.width"
+plot_stage_dynamics <- function(timepoint, type){
+  label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
+  plot_df <- chip_dfs[[timepoint]][chip_dfs[[timepoint]]$peak, ]
+  plot_df$genes <- rownames(plot_df)
+  plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns))
+  violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
+           add = "boxplot", add.params = list(fill = "white")) + scale_fill_manual(values=cols_chipdyns) + rotate_x_text(45)
+  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values=cols_chipdyns) 
+  grid.arrange(violin_plot, ecdf_plot, top=paste(timepoint), ncol=2)
+}
 
-label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
-plot_df <- chip_dfs[[timepoint]][chip_dfs[[timepoint]]$peak, ]
-plot_df$genes <- rownames(plot_df)
-plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns))
-violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
-         add = "boxplot", add.params = list(fill = "white")) #+ stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(type, prev_stage))
-ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn")
-grid.arrange(violin_plot, ecdf_plot, top=paste("Maintenance"), ncol=2)
+plot_stage_dynamics(timepoint = "Spermatid", type = "peak.width")
+plot_stage_dynamics(timepoint = "Spermatid", type = "promoter.enrich")
+plot_stage_dynamics(timepoint = "Spermatid", type = "promoter.mean")
+plot_stage_dynamics(timepoint = "Spermatid", type = "promoter.max")
+
+plot_stage_dynamics(timepoint = "ZGA", type = "peak.width")
+plot_stage_dynamics(timepoint = "ZGA", type = "promoter.enrich")
+plot_stage_dynamics(timepoint = "ZGA", type = "promoter.mean")
+plot_stage_dynamics(timepoint = "ZGA", type = "promoter.max")
+
+```
+
+```{r message=FALSE, warning=FALSE}
+library(PerformanceAnalytics)
+corr_plot <- function(stage){
+  plot_df <- chip_dfs[[stage]]
+  plot_df <- plot_df[plot_df$peak,c("peak.width", "promoter.enrich", "promoter.max", "promoter.mean")]
+  chart.Correlation(plot_df, histogram = TRUE, method = "spearman")
+  mtext(paste(stage), side=3, line=3)
+}
+
+lapply(stages, corr_plot)
+
 ```
 
