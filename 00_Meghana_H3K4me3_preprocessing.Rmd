@@ -3,6 +3,12 @@ title: "Meghana H3K4me3 Maintenance - 01 H3K4me3 analysis"
 output: html_notebook
 ---
 
+## Settings
+```{r}
+sperm_data = "Oikawa"
+```
+
+
 ##Load genome and fasta
 ```{r message=FALSE, warning=FALSE}
 suppressPackageStartupMessages(library(AnnotationDbi))
@@ -64,15 +70,23 @@ rm(H3K4me3_spermatid.cov1, H3K4me3_spermatid.cov2, H3K4me3_spermatid.cov3, H3K4m
 print("Dataset: Spermatid H3K4me3 Teperek loaded")
 ```
 
-##Load dataset: Sperm H3K4me3 Teperek
+##Load dataset: Sperm H3K4me3 Oikawa OR Teperek
 ```{r warning=FALSE}
-setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Realigned_published/H3K4me3_teperek/")
+if(sperm_data == "Oikawa"){
+  setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/1_Sperm_H3K4me3_Oikawa_Xl10.1")
 
-#Load data
-#H3K4me3_sperm.cov1 <- readGranges("GSM1944479_ranges.rds")
-H3K4me3_sperm.cov2 <- readGranges("GSM1944481_ranges.rds")
-H3K4me3_sperm.cov3 <- readGranges("GSM1944483_ranges.rds")
-H3K4me3_sperm.cov <- c(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3)
+  #H3K4me3_sperm.cov1 <- readGranges("GSM3587294_ranges.rds")
+  H3K4me3_sperm.cov2 <- readGranges("GSM3587295_ranges.rds")
+  H3K4me3_sperm.cov3 <- readGranges("GSM3587296_ranges.rds")
+  H3K4me3_sperm.cov <- c(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3)
+} else if(sperm_data == "Teperek"){
+  setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Realigned_published/H3K4me3_teperek/")
+
+  #H3K4me3_sperm.cov1 <- readGranges("GSM1944479_ranges.rds")
+  H3K4me3_sperm.cov2 <- readGranges("GSM1944481_ranges.rds")
+  H3K4me3_sperm.cov3 <- readGranges("GSM1944483_ranges.rds")
+  H3K4me3_sperm.cov <- c(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3)
+}
 
 #Merged data
 H3K4me3_sperm_raw <- enrichment(H3K4me3_sperm.cov, "Sperm Merged Reps")
@@ -83,7 +97,7 @@ H3K4me3_sperm_raw <- enrichment(H3K4me3_sperm.cov, "Sperm Merged Reps")
 #H3K4me3_sperm.rep3 <- enrichment(H3K4me3_sperm.cov3, "Sperm Rep3")
 
 rm(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3, H3K4me3_sperm.cov)
-print("Dataset: Sperm H3K4me3 Teperek loaded")
+print(paste0("Dataset: Sperm H3K4me3 ", sperm_data, " loaded"))
 ```
 
 
@@ -127,10 +141,16 @@ rm(H3K4me3_zga.cov1, H3K4me3_zga.cov2, H3K4me3_zga.cov)
 print("ZGA (St10.5) H3K4me3 Session loaded")
 ```
 
+```{r}
+chip_norm_mats <- list(H3K4me3_spermatid_raw, H3K4me3_sperm_raw, H3K4me3_prezga_raw, H3K4me3_zga_raw)
+names(chip_norm_mats) <- stages
+```
+
 ## Load peak calling data (broad)
 ```{r message=FALSE, warning=FALSE}
 library(rtracklayer)
 library(ggpubr)
+library(EnrichedHeatmap)
 #Load bed files for spermatid, sperm, pre-ZGA, post-ZGA
 setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias Data/Tobias-H3K4me3_ChIP_datasets_broadpeaks/GSE75164")
 D0_bed1 <- import("GSM1944497_broad.bed", format = "bed")
@@ -139,16 +159,17 @@ D0_bed3 <- import("GSM1944499_broad.bed", format = "bed")
 D0_spdH3K4me3_bed <- c(D0_bed1, D0_bed2, D0_bed3)
 strand(D0_spdH3K4me3_bed) <- NA
 
-#setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias Data/Tobias-H3K4me3_ChIP_datasets_broadpeaks/GSE75164")
-#D1_bed2 <- import("GSM1944481_broad.bed", format = "bed")
-#D1_bed3 <- import("GSM1944483_broad.bed", format = "bed")
-#D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
-#strand(D1_spH3K4me3_bed) <- NA
-
-setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias Data/Tobias-H3K4me3_ChIP_datasets_broadpeaks/GSE125982")
-D1_bed2 <- import("GSM3587295_broad.bed", format = "bed")
-D1_bed3 <- import("GSM3587296_broad.bed", format = "bed")
-D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
+if(sperm_data == "Oikawa"){
+  setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias Data/Tobias-H3K4me3_ChIP_datasets_broadpeaks/GSE125982")
+  D1_bed2 <- import("GSM3587295_broad.bed", format = "bed")
+  D1_bed3 <- import("GSM3587296_broad.bed", format = "bed")
+  D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
+} else if(sperm_data == "Teperek"){
+  setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias Data/Tobias-H3K4me3_ChIP_datasets_broadpeaks/GSE75164")
+  D1_bed2 <- import("GSM1944481_broad.bed", format = "bed")
+  D1_bed3 <- import("GSM1944483_broad.bed", format = "bed")
+  D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
+}
 strand(D1_spH3K4me3_bed) <- NA
 
 setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias Data/Tobias-H3K4me3_ChIP_datasets_broadpeaks/GSE125982")
@@ -174,9 +195,6 @@ peak_widths <- lapply(stages, function(y){sapply(overlaps[[y]], function(x){if(i
 names(peak_widths) <- stages
 peak_binary <- lapply(peak_widths, function(x){!is.na(x)})
 
-chip_norm_mats <- list(H3K4me3_spermatid_raw, H3K4me3_sperm_raw, H3K4me3_prezga_raw, H3K4me3_zga_raw)
-names(chip_norm_mats) <- stages
-
 build_df <- function(norm_matrix, binarized, widths){
   df <- data.frame("promoter.enrich"=enriched_score(norm_matrix), 
                    "peak"=binarized, 
@@ -193,7 +211,7 @@ names(chip_dfs) <- stages
 ```{r}
 #Save data
 save(chip_dfs, chip_norm_mats, allgenes, promoters_chr, stages,
-     file="h3k4me3_data_log.RData")
+     file=paste0("h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```
 
 # Genomic distribution of peaks

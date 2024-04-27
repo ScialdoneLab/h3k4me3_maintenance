@@ -6,10 +6,10 @@ output: html_notebook
 ## Settings
 ```{r}
 clustered_chip_groups <- FALSE
-chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered="Y_Y_N_Y", Nost=c("Y_Y_Y_N", "Y_Y_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered="Y_Y_N_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
 #chip_clustering <- list(N_Y_ = "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"), Y_Y_ = c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N"), Y_N_ = c("Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N"), Absent="N_N_N_N"))
 
-load("h3k4me3_data_log.RData")
+load("h3k4me3_data_sperm_Oikawa.RData")
 ```
 
 ```{r}
@@ -58,7 +58,7 @@ if(clustered_chip_groups){
 
 ## Plot legend
 ```{r fig.height=6, fig.width=3}
-remove_NNNN <- FALSE
+remove_NNNN <- TRUE
 
 groups <- names(chip_dyns)
 if(remove_NNNN){groups <- groups[!groups %in% c("N_N_N_N", "Absent")]}
@@ -106,39 +106,43 @@ library(ggalluvial)
 library(dplyr)
 library(ggpubr)
 
-remove_NNNN <- FALSE
-remove_YYYY <- FALSE
-
-get_row <- function(chip_dyn){
-  levels = unlist(strsplit(names(chip_dyn), split = "_"))
-  return(c(levels, length(chip_dyn[[1]]), names(chip_dyn)))
+plot_alluvial <- function(remove_NNNN, remove_YYYY){
+  get_row <- function(chip_dyn){
+    levels = unlist(strsplit(names(chip_dyn), split = "_"))
+    return(c(levels, length(chip_dyn[[1]]), names(chip_dyn)))
+  }
+  plot_df = data.frame()
+  for (i in 1:length(chip_dyns_complete)){
+    row = get_row(chip_dyns_complete[i])
+    plot_df = rbind(plot_df, row)
+  }
+  #if(clustered_chip_groups){
+  #  plot_df <- plot_df[plot_df[,ncol(plot_df)] %in% unlist(chip_clustering),]
+  #}
+  
+  colnames(plot_df) <- c(stages, "Freq", "Dynamic")
+  plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
+  
+  if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
+  if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
+  
+  for(stage in stages){
+    plot_df[,stage] <- factor(plot_df[,stage], levels=c("Y", "N"))
+  }
+  
+  ggplot(plot_df,
+         aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
+    geom_alluvium(aes(fill = Dynamic), width = 1/12) + theme_pubr() +
+    geom_stratum(width = 1/12, fill = "grey", color = "black", alpha = .75) +
+    geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+    scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
+    scale_fill_manual(values=euler_cols)
 }
-plot_df = data.frame()
-for (i in 1:length(chip_dyns_complete)){
-  row = get_row(chip_dyns_complete[i])
-  plot_df = rbind(plot_df, row)
-}
-#if(clustered_chip_groups){
-#  plot_df <- plot_df[plot_df[,ncol(plot_df)] %in% unlist(chip_clustering),]
-#}
 
-colnames(plot_df) <- c(stages, "Freq", "Dynamic")
-plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
+plot_alluvial(remove_NNNN = FALSE, remove_YYYY = FALSE)
+plot_alluvial(remove_NNNN = TRUE, remove_YYYY = FALSE)
+plot_alluvial(remove_NNNN = TRUE, remove_YYYY = TRUE)
 
-if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
-if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
-
-for(stage in stages){
-  plot_df[,stage] <- factor(plot_df[,stage], levels=c("Y", "N"))
-}
-
-ggplot(plot_df,
-       aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
-  geom_alluvium(aes(fill = Dynamic), width = 1/12) + theme_pubr() +
-  geom_stratum(width = 1/12, fill = "grey", color = "black", alpha = .75) +
-  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
-  scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
-  scale_fill_manual(values=euler_cols)
 ```
 
 
@@ -189,9 +193,9 @@ simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont
 
 #Differences in Maintenance at each transition
 ```{r fig.height=5, fig.width=10}
-type = "promoter.max"
-
-transition_diff <- function(prev_stage, next_stage, type="peak.width"){
+transition_diff <- function(transition, type){
+  prev_stage <- transition[1]
+  next_stage <- transition[2]
   genes_prev <- chip_dfs[[prev_stage]]$peak
   genes_maintain <- chip_dfs[[next_stage]]$peak
   plot_df <- data.frame(allgenes$gene_id[genes_prev], factor(genes_maintain[genes_prev], levels=c("FALSE","TRUE"),labels=c("Not maintained", "Maintained")),
@@ -203,10 +207,11 @@ transition_diff <- function(prev_stage, next_stage, type="peak.width"){
   grid.arrange(violin_plot, ecdf_plot, top=paste("Maintenance from", prev_stage, "to", next_stage), ncol=2)
 }
 
-transition_diff("Spermatid", "Sperm", type=type)
-transition_diff("Sperm", "Pre-ZGA",  type=type)
-transition_diff("Pre-ZGA", "ZGA",  type=type)
-transition_diff("Spermatid", "ZGA",  type=type)
+transitions <- list(c("Spermatid", "Sperm"), c("Sperm", "Pre-ZGA"), c("Pre-ZGA", "ZGA"), c("Spermatid", "ZGA"))
+res <- lapply(transitions, transition_diff, type="peak.width")
+res <- lapply(transitions, transition_diff, type="promoter.enrich")
+res <- lapply(transitions, transition_diff, type="promoter.mean")
+res <- lapply(transitions, transition_diff, type="promoter.max")
 ```
 
 
@@ -243,7 +248,7 @@ corr_plot <- function(stage){
   mtext(paste(stage), side=3, line=3)
 }
 
-lapply(stages, corr_plot)
+res <- lapply(stages, corr_plot)
 
 ```
 
