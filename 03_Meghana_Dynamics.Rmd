@@ -98,8 +98,8 @@ plot_peak <- function(name, groups){
   stage_raw$gene <- rownames(stage_raw)
   melted <- melt(stage_raw)
   colnames(melted) <- c("dynamics", "Gene", "Genomic location", "Coverage")
-  rna_plot <- ggline(melted, x = "Genomic location", y = "Coverage",
-   add = "mean_se", conf.int = TRUE, color="dynamics") + scale_color_manual(values=cols) + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + ggtitle(name)
+  plot <- ggline(melted, x = "Genomic location", y = "Coverage",
+   add = "mean_se", conf.int = TRUE, color="dynamics") + scale_color_manual(values=cols) + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + labs(y=expression(log[2](coverage + 1)), x = "+/-1kb of TSS") + ggtitle(name)
 }
 
 lapply(stages, plot_peak, groups="rna")
