@@ -83,6 +83,7 @@ plot_balloonplot(remove_ND_NNNN = TRUE)
 # Peak shape comparison
 ```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
 library(reshape2)
+library(ggpubr)
 
 label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
 plot_peak <- function(name, groups){
@@ -111,6 +112,8 @@ lapply(stages, plot_peak, groups="chip")
 ```{r fig.height=5, fig.width=10}
 library(ggpubr)
 require(reshape2)
+library(ggplot2)
+
 mask_peak <- function(df){
   df$promoter.enrich[!df$peak] <- NA
   df$promoter.max[!df$peak] <- NA
@@ -118,12 +121,15 @@ mask_peak <- function(df){
   return(df)
 }
 preproc_df <- function(type){
-  masked_dfs <- lapply(chip_dfs, mask_peak)
+  #masked_dfs <- lapply(chip_dfs, mask_peak)
+  masked_dfs <- chip_dfs
+  
   plot_df <- do.call(cbind, masked_dfs)
   plot_df <- plot_df[, grep(type, colnames(plot_df))]
   plot_df$genes <- allgenes$gene_id
   plot_df <- melt(plot_df)
-  colnames(plot_df) <- c("Gene","Stage", paste(type))  
+  colnames(plot_df) <- c("Gene","Stage", paste(type)) 
+  plot_df[is.na(plot_df[,paste(type)]),paste(type)] <- 0
   plot_df <- plot_df[!is.na(plot_df[,type]),]
   plot_df$Stage <- factor(plot_df$Stage, levels=levels(plot_df$Stage), labels=substr(levels(plot_df$Stage), 1, nchar(levels(plot_df$Stage))-nchar(type)-1))
   return(plot_df)
@@ -154,14 +160,12 @@ plot_chip_diffs <- function(groups, type){
   }
   plot_df <- preproc_df(type)
   plot_df$dyn <- sapply(plot_df$Gene, label_dyn, dyns = dyn)
-  #ggviolin(plot_df, x = "dyn", y = "Peak width", fill = "dyn",
-  #         add = "boxplot", add.params = list(fill = "white")) + facet_wrap(~Stage) + scale_fill_manual(values=cols)
   ggecdf(plot_df, x = paste(type), color = "dyn") + facet_wrap(~Stage) + scale_color_manual(values=cols)
-  #ggviolin(plot_df, x = "Stage", y = "Peak width", fill = "Stage",
-  #         add = c("boxplot", "jitter"), add.params = list(fill = "white")) + facet_wrap(~dyn)
-  #ggecdf(plot_df, x = paste(type), color = "Stage") + facet_wrap(~dyn)
-  #ggline(plot_df, x = "Stage", y = paste(type), color = "dyn",  add=c("mean_se")) + scale_color_manual(values=cols)
-  #ggline(plot_df, x = "Stage", y = paste(type), color = "dyn",  add=c("mean_se")) + scale_color_manual(values=cols) + facet_wrap(~dyn)
+  #ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn") +
+  #        # add = "boxplot", add.params = list(fill = "white")) + 
+  #  facet_wrap(~Stage) + scale_fill_manual(values=cols) #+ 
+    #geom_signif(comparisons = split(t(combn(c(names(dyn), "NA"), 2)), seq(nrow(t(combn(c(names(dyn), "NA"), 2))))), 
+   #           map_signif_level = TRUE, step_increase = 0.12)
 }
 lapply(types, plot_chip_diffs, groups="rna")
 lapply(types, plot_chip_diffs, groups="chip")

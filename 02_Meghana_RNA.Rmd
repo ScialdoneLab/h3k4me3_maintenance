@@ -27,26 +27,40 @@ spermatid.detected <- unique(spermatid.detected)
 
 ##Load dataset: Egg + Nascent (Chen)
 ```{r}
-detected_thr = 5
 chen_se <- readRDS("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_rnaseq/GSE201835/se.rds")
+G_thr = 5
+Z_thr = 5
+
 chen <- as.data.frame(assays(chen_se)$tpms)
 chen$name = rowData(chen_se)$name
 chen <- chen[!duplicated(chen$name),]
-
-egg.detected <- chen[chen[,"GSM6076970"] > detected_thr & chen[,"GSM6076971"] > detected_thr, "name"]
+ 
+egg.detected <- chen[chen[,"GSM6076970"] > G_thr & chen[,"GSM6076971"] > G_thr, "name"]
 egg.detected <- unique(egg.detected)
-
-zga_nascent.6hpf = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > detected_thr &     
-                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > detected_thr
-zga_nascent.7hpf = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > detected_thr & 
-                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > detected_thr
-zga_nascent.8hpf = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > detected_thr & 
-                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > detected_thr
-zga_nascent.9hpf = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > detected_thr & (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > detected_thr & 
-                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > detected_thr & (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > detected_thr
-
-zga_nascent.detected <- zga_nascent.6hpf | zga_nascent.7hpf | zga_nascent.8hpf | zga_nascent.9hpf
-zga_nascent.detected <- unique(chen[zga_nascent.detected, "name"])
+ 
+zga_nascent.6hpf_stringent = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > Z_thr &     
+                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.7hpf_stringent = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > Z_thr & 
+                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.8hpf_stringent = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > Z_thr &
+                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.9hpf_stringent = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > Z_thr & 
+                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > Z_thr
+ 
+zga_nascent.detected_stringent <- zga_nascent.6hpf_stringent | zga_nascent.7hpf_stringent | zga_nascent.8hpf_stringent | zga_nascent.9hpf_stringent
+zga_nascent.detected_stringent <- unique(chen[zga_nascent.detected_stringent, "name"])
+ 
+zga_nascent.6hpf_lenient = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > Z_thr |     
+                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.7hpf_lenient = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > Z_thr | 
+                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.8hpf_lenient = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > Z_thr |
+                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.9hpf_lenient = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > Z_thr | 
+                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > Z_thr
+ 
+zga_nascent.detected_lenient <- zga_nascent.6hpf_lenient | zga_nascent.7hpf_lenient | zga_nascent.8hpf_lenient | zga_nascent.9hpf_lenient
+zga_nascent.detected_lenient <- unique(chen[zga_nascent.detected_lenient, "name"])
 ```
 
 ###Detected genes at each stage
@@ -54,20 +68,21 @@ zga_nascent.detected <- unique(chen[zga_nascent.detected, "name"])
 rna_genes <- intersect(unique(union(chen$name, teperek$name)), allgenes$gene_id)
 spermatid.detected <- spermatid.detected[spermatid.detected %in% rna_genes]
 egg.detected <- egg.detected[egg.detected %in% rna_genes]
-zga_nascent.detected <- zga_nascent.detected[zga_nascent.detected %in% rna_genes]
+zga_nascent.detected_stringent <- zga_nascent.detected_stringent[zga_nascent.detected_stringent %in% rna_genes]
+zga_nascent.detected_lenient <- zga_nascent.detected_lenient[zga_nascent.detected_lenient %in% rna_genes]
 ```
 
 ##Definition of dynamic groups
 ```{r}
 rna_names_complete <- c("Monly", "Ponly", "Zonly", "MPonly", "MZonly", "PZonly", "MPZ", "ND")
-Monly <- setdiff(setdiff(egg.detected, spermatid.detected), zga_nascent.detected)
-Zonly <- setdiff(setdiff(zga_nascent.detected, egg.detected), spermatid.detected)
-Ponly <-  setdiff(setdiff(spermatid.detected, zga_nascent.detected), egg.detected)
-MZonly <- setdiff(intersect(egg.detected, zga_nascent.detected), spermatid.detected)
-MPonly <- setdiff(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
-PZonly <- setdiff(intersect(spermatid.detected, zga_nascent.detected), egg.detected)
-MPZ <- intersect(intersect(egg.detected, spermatid.detected), zga_nascent.detected)
-ND <- setdiff(setdiff(setdiff(allgenes$gene_id, egg.detected), spermatid.detected), zga_nascent.detected)
+Monly <- setdiff(setdiff(egg.detected, spermatid.detected), zga_nascent.detected_lenient)
+Zonly <- setdiff(setdiff(zga_nascent.detected_stringent, egg.detected), spermatid.detected)
+Ponly <-  setdiff(setdiff(spermatid.detected, zga_nascent.detected_lenient), egg.detected)
+MZonly <- setdiff(intersect(egg.detected, zga_nascent.detected_stringent), spermatid.detected)
+MPonly <- setdiff(intersect(egg.detected, spermatid.detected), zga_nascent.detected_lenient)
+PZonly <- setdiff(intersect(spermatid.detected, zga_nascent.detected_stringent), egg.detected)
+MPZ <- intersect(intersect(egg.detected, spermatid.detected), zga_nascent.detected_stringent)
+ND <- setdiff(setdiff(setdiff(allgenes$gene_id,egg.detected), spermatid.detected), zga_nascent.detected_lenient)
 
 if(clustered_rna_groups){
   rna_dyns <- lapply(rna_clustering, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
