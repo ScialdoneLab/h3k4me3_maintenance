@@ -5,8 +5,14 @@ output: html_notebook
 
 ## Settings
 ```{r}
-clustered_chip_groups <- FALSE
-chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered="Y_Y_N_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+clustered_chip_groups <- TRUE
+
+chip_clustering <- list("Kept" = "Y_Y_Y_Y", "Recovered"="Y_Y_N_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N")
+cols_clustered = setNames(c("#6ca239","#6bc7ab","#f2c237","#e17e39","#b73a2f","#5f91c1","#3b4ca8","grey"), names(chip_clustering))
+
+#chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered="Y_Y_N_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+#cols_clustered = setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_clustering))
+
 #chip_clustering <- list(N_Y_ = "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"), Y_Y_ = c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N"), Y_N_ = c("Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N"), Absent="N_N_N_N"))
 
 load("h3k4me3_data_sperm_Oikawa.RData")
@@ -36,7 +42,7 @@ Y_N_N_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip
 
 if(clustered_chip_groups){
   chip_dyns <- lapply(chip_clustering, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
-  cols_chipdyns <- setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_dyns))
+  cols_chipdyns <- cols_clustered
 } else {
   cols_chipdyns <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), chip_names_complete)
   chip_dyns <- setNames(list(Y_Y_Y_Y, Y_Y_Y_N, Y_Y_N_Y, Y_Y_N_N, Y_N_Y_Y, Y_N_Y_N, Y_N_N_Y, Y_N_N_N,
@@ -212,31 +218,6 @@ res <- lapply(transitions, transition_diff, type="peak.width")
 res <- lapply(transitions, transition_diff, type="promoter.enrich")
 res <- lapply(transitions, transition_diff, type="promoter.mean")
 res <- lapply(transitions, transition_diff, type="promoter.max")
-```
-
-
-```{r fig.height=5, fig.width=10}
-plot_stage_dynamics <- function(timepoint, type){
-  label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
-  plot_df <- chip_dfs[[timepoint]][chip_dfs[[timepoint]]$peak, ]
-  plot_df$genes <- rownames(plot_df)
-  plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns))
-  violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
-           add = "boxplot", add.params = list(fill = "white")) + scale_fill_manual(values=cols_chipdyns) + rotate_x_text(45)
-  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values=cols_chipdyns) 
-  grid.arrange(violin_plot, ecdf_plot, top=paste(timepoint), ncol=2)
-}
-
-plot_stage_dynamics(timepoint = "Spermatid", type = "peak.width")
-plot_stage_dynamics(timepoint = "Spermatid", type = "promoter.enrich")
-plot_stage_dynamics(timepoint = "Spermatid", type = "promoter.mean")
-plot_stage_dynamics(timepoint = "Spermatid", type = "promoter.max")
-
-plot_stage_dynamics(timepoint = "ZGA", type = "peak.width")
-plot_stage_dynamics(timepoint = "ZGA", type = "promoter.enrich")
-plot_stage_dynamics(timepoint = "ZGA", type = "promoter.mean")
-plot_stage_dynamics(timepoint = "ZGA", type = "promoter.max")
-
 ```
 
 ```{r message=FALSE, warning=FALSE}

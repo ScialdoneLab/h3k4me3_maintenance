@@ -191,9 +191,9 @@ h3k4stages <- list(D0_spdH3K4me3_bed, D1_spH3K4me3_bed, D3_S7H3K4me3_bed, D6_S10
 names(h3k4stages) <- stages
 
 overlaps <- lapply(h3k4stages, function(x){findOverlaps(promoters_1kb, x, select = "first")})
-peak_widths <- lapply(stages, function(y){sapply(overlaps[[y]], function(x){if(is.na(x)){NA}else{width(h3k4stages[[y]][x])}})})
+peak_widths <- lapply(stages, function(y){sapply(overlaps[[y]], function(x){if(is.na(x)){0}else{width(h3k4stages[[y]][x])}})})
 names(peak_widths) <- stages
-peak_binary <- lapply(peak_widths, function(x){!is.na(x)})
+peak_binary <- lapply(peak_widths, function(x){x>0})
 
 build_df <- function(norm_matrix, binarized, widths){
   df <- data.frame("promoter.enrich"=enriched_score(norm_matrix), 

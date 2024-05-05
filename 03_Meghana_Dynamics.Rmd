@@ -121,16 +121,16 @@ mask_peak <- function(df){
   return(df)
 }
 preproc_df <- function(type){
-  #masked_dfs <- lapply(chip_dfs, mask_peak)
-  masked_dfs <- chip_dfs
+  dfs <- chip_dfs
+  #dfs <- lapply(dfs, mask_peak)
   
-  plot_df <- do.call(cbind, masked_dfs)
+  plot_df <- do.call(cbind, dfs)
   plot_df <- plot_df[, grep(type, colnames(plot_df))]
   plot_df$genes <- allgenes$gene_id
   plot_df <- melt(plot_df)
   colnames(plot_df) <- c("Gene","Stage", paste(type)) 
   plot_df[is.na(plot_df[,paste(type)]),paste(type)] <- 0
-  plot_df <- plot_df[!is.na(plot_df[,type]),]
+  #plot_df <- plot_df[!is.na(plot_df[,type]),]
   plot_df$Stage <- factor(plot_df$Stage, levels=levels(plot_df$Stage), labels=substr(levels(plot_df$Stage), 1, nchar(levels(plot_df$Stage))-nchar(type)-1))
   return(plot_df)
 }
@@ -146,11 +146,11 @@ types = list("peak.width", "promoter.enrich", "promoter.mean", "promoter.max")
 res <- lapply(types, plot_distribution)
 ```
 
-#Differences in Chip groups
-```{r fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
-label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
+#Differences in Chip/RNA groups
+```{r fig.height=5, fig.width=10}
+groups="chip"
 
-plot_chip_diffs <- function(groups, type){
+plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE){
   if(groups == "rna"){
     cols = cols_rnadyns
     dyn = rna_dyns
@@ -158,16 +158,23 @@ plot_chip_diffs <- function(groups, type){
     cols = cols_chipdyns
     dyn = chip_dyns
   }
-  plot_df <- preproc_df(type)
-  plot_df$dyn <- sapply(plot_df$Gene, label_dyn, dyns = dyn)
-  ggecdf(plot_df, x = paste(type), color = "dyn") + facet_wrap(~Stage) + scale_color_manual(values=cols)
-  #ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn") +
-  #        # add = "boxplot", add.params = list(fill = "white")) + 
-  #  facet_wrap(~Stage) + scale_fill_manual(values=cols) #+ 
-    #geom_signif(comparisons = split(t(combn(c(names(dyn), "NA"), 2)), seq(nrow(t(combn(c(names(dyn), "NA"), 2))))), 
-   #           map_signif_level = TRUE, step_increase = 0.12)
+  label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
+  plot_df <- chip_dfs[[timepoint]]
+  if(onlypeaks){plot_df <- plot_df[plot_df$peak, ]}
+  plot_df$genes <- rownames(plot_df)
+  plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = dyn))
+  #plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns), levels=c("Kept", "Recovered", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm", "GainedEarly", "GainedLate"))
+  plot_df$dyn <- factor(plot_df$dyn, levels = levels(reorder(plot_df$dyn, plot_df[,paste(type)], median, decreasing=TRUE)))
+  violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
+           add = "boxplot", add.params = list(fill = "white")) + scale_fill_manual(values=cols) + rotate_x_text(45) + guides(fill = guide_legend(nrow = 2))
+  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values=cols) + guides(color = guide_legend(nrow = 2))
+  grid.arrange(violin_plot, ecdf_plot, top=paste(timepoint), ncol=2)
 }
-lapply(types, plot_chip_diffs, groups="rna")
-lapply(types, plot_chip_diffs, groups="chip")
+
+res = lapply(stages, plot_stage_dynamics, type="peak.width", groups)
+res = lapply(stages, plot_stage_dynamics, type="promoter.enrich", groups)
+res = lapply(stages, plot_stage_dynamics, type="promoter.mean", groups)
+res = lapply(stages, plot_stage_dynamics, type="promoter.max", groups)
+
 ```
 
