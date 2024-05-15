@@ -6,8 +6,14 @@ output: html_notebook
 ##Settings
 ```{r}
 clustered_rna_groups = TRUE
-rna_clustering <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
-cols_rna_clusters <- c(GS="#1B9E77", GZ="#D95F02", ZS = "#7570B3", ND = "#666666")
+#rna_clustering <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
+#cols_rna_clusters <- c(GS="#1B9E77", GZ="#D95F02", ZS = "#7570B3", ND = "#666666")
+
+rna_clustering <- list(Zygotic = c("Zonly", "MZonly", "PZonly", "MPZ"), NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
+cols_rna_clusters <- c(Zygotic="#9636d1", NonZygotic="#b7eb34")
+
+#rna_clustering <- list(PO = c("Ponly", "MPonly"), ZO = c("Zonly", "MZonly"), PZ=c("MPZ", "PZonly"), ND = c("ND", "Monly"))
+#cols_rna_clusters <- c(PO="#D95F02", ZO = "#7570B3", PZ = "#E6AB02", ND = "#666666")
 ```
 
 ## Load Teperek TPM
@@ -30,6 +36,7 @@ spermatid.detected <- unique(spermatid.detected)
 chen_se <- readRDS("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_rnaseq/GSE201835/se.rds")
 G_thr = 5
 Z_thr = 5
+Z_thr_lenient = 0
 
 chen <- as.data.frame(assays(chen_se)$tpms)
 chen$name = rowData(chen_se)$name
@@ -50,14 +57,14 @@ zga_nascent.9hpf_stringent = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr
 zga_nascent.detected_stringent <- zga_nascent.6hpf_stringent | zga_nascent.7hpf_stringent | zga_nascent.8hpf_stringent | zga_nascent.9hpf_stringent
 zga_nascent.detected_stringent <- unique(chen[zga_nascent.detected_stringent, "name"])
  
-zga_nascent.6hpf_lenient = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > Z_thr |     
-                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > Z_thr
-zga_nascent.7hpf_lenient = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > Z_thr | 
-                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > Z_thr
-zga_nascent.8hpf_lenient = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > Z_thr |
-                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > Z_thr
-zga_nascent.9hpf_lenient = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr | (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > Z_thr | 
-                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > Z_thr | (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > Z_thr
+zga_nascent.6hpf_lenient = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > Z_thr_lenient |     
+                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > Z_thr_lenient
+zga_nascent.7hpf_lenient = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > Z_thr_lenient | 
+                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > Z_thr_lenient
+zga_nascent.8hpf_lenient = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > Z_thr_lenient |
+                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > Z_thr_lenient
+zga_nascent.9hpf_lenient = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > Z_thr_lenient | 
+                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > Z_thr_lenient
  
 zga_nascent.detected_lenient <- zga_nascent.6hpf_lenient | zga_nascent.7hpf_lenient | zga_nascent.8hpf_lenient | zga_nascent.9hpf_lenient
 zga_nascent.detected_lenient <- unique(chen[zga_nascent.detected_lenient, "name"])
@@ -97,10 +104,15 @@ rna_dyns_sizes = unlist(lapply(rna_dyns, function(x) length(x)))
 
 ## Save data
 ```{r}
-if(clustered_rna_groups){
-  save(rna_dyns, cols_rnadyns, file="rna_data_clustered.RData")
+response <- readline("Do you want to save the dynamics? (yes/no): ")
+if (tolower(response) == "yes") {
+  if(clustered_rna_groups){
+    save(rna_dyns, cols_rnadyns, file="rna_data_clustered.RData")
+  } else {
+    save(rna_dyns, cols_rnadyns, file="rna_data.RData")
+  }
 } else {
-  save(rna_dyns, cols_rnadyns, file="rna_data.RData")
+  print("Dynamics not saved")
 }
 ```
 

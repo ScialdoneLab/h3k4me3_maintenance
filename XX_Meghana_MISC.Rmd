@@ -3,6 +3,79 @@ title: "Meghana H3K4me3 Maintenance - 00 Other"
 output: html_notebook
 ---
 
+#Overall peak analysis
+```{r fig.height=5, fig.width=10}
+library(ggpubr)
+require(reshape2)
+library(ggplot2)
+library(gridExtra)
+
+mask_peak <- function(df){
+  df$promoter.enrich[!df$peak] <- NA
+  df$promoter.max[!df$peak] <- NA
+  df$promoter.mean[!df$peak] <- NA
+  return(df)
+}
+preproc_df <- function(type){
+  dfs <- chip_dfs
+  #dfs <- lapply(dfs, mask_peak)
+  
+  plot_df <- do.call(cbind, dfs)
+  plot_df <- plot_df[, grep(type, colnames(plot_df))]
+  plot_df$genes <- allgenes$gene_id
+  plot_df <- melt(plot_df)
+  colnames(plot_df) <- c("Gene","Stage", paste(type)) 
+  plot_df[is.na(plot_df[,paste(type)]),paste(type)] <- 0
+  #plot_df <- plot_df[!is.na(plot_df[,type]),]
+  plot_df$Stage <- factor(plot_df$Stage, levels=levels(plot_df$Stage), labels=substr(levels(plot_df$Stage), 1, nchar(levels(plot_df$Stage))-nchar(type)-1))
+  return(plot_df)
+}
+
+plot_distribution <- function(type){
+  plot_df <- preproc_df(type)
+  density_plot <- ggdensity(data=plot_df, x=paste(type), fill = "Stage", add_density = TRUE) #+ facet_wrap(~Stage)
+  ecdf_plot <- ggecdf(data=plot_df, x=paste(type), color = "Stage") #+guides(colour = "none")
+  grid.arrange(density_plot, ecdf_plot, ncol=2)
+}
+
+types = list("peak.width", "promoter.enrich", "promoter.mean", "promoter.max")
+res <- lapply(types, plot_distribution)
+```
+
+## late night session misc
+```{r}
+df <- chip_dfs[["Sperm"]]
+df$gene_length <- width(allgenes)
+ggscatter(df, x="gene_length", y="peak.width") + xlim(0, 10000)
+weird <- rownames(df[!is.na(df$peak.width),])[df$gene_length[!is.na(df$peak.width)]+5000 < df$peak.width[!is.na(df$peak.width)]]
+res <- lapply(rna_dyns, function(dyn){intersect(weird, dyn)})
+str(res)
+# remove peaks that span multiple promoters?
+
+
+label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
+
+plot_df <- chip_dfs[["Sperm"]]
+plot_df$dyn <- sapply(rownames(plot_df), label_dyn, dyns = rna_dyns)
+#plot_df <- plot_df[plot_df$peak,c("peak.width", "promoter.enrich", "promoter.max", "promoter.mean")]
+ggscatter(plot_df, x="peak.width", "promoter.enrich", color="dyn")+facet_wrap(~dyn)
+
+View(plot_df[plot_df$dyn == "ZS",])
+
+res <- plot_df[plot_df$peak,]
+wide_zs_sperm <- rownames(res)[res$dyn == "ZS" & (res$peak.width>3000)]
+
+lapply(chip_dyns, function(dyn) intersect(wide_zs_sperm, dyn))
+
+gs_gained <- intersect(chip_dyns$Gained, rna_dyns$GS)
+str(chip_dyns)
+
+enrichGO <- go_enrichment(gs_gained)
+hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
+if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'))}
+```
+
+
 ```{r}
 ###Venn diagram with all gene groups
 library(VennDiagram)

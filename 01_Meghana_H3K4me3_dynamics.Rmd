@@ -7,11 +7,11 @@ output: html_notebook
 ```{r}
 clustered_chip_groups <- TRUE
 
-chip_clustering <- list("Kept" = "Y_Y_Y_Y", "Recovered"="Y_Y_N_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N")
-cols_clustered = setNames(c("#6ca239","#6bc7ab","#f2c237","#e17e39","#b73a2f","#5f91c1","#3b4ca8","grey"), names(chip_clustering))
+#chip_clustering <- list("Kept" = "Y_Y_Y_Y", "RecoveredLate"="Y_Y_N_Y", "RecoveredEarly"="Y_N_Y_Y", "RecoveredLong"="Y_N_N_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N")
+#cols_clustered = setNames(c("#6ca239","#6bc7ab", "#c2ffd3", "#004414","#f2c237","#e17e39","#b73a2f","#5f91c1","#3b4ca8","grey"), names(chip_clustering))
 
-#chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered="Y_Y_N_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
-#cols_clustered = setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_clustering))
+chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"), Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+cols_clustered = setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_clustering))
 
 #chip_clustering <- list(N_Y_ = "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"), Y_Y_ = c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N"), Y_N_ = c("Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N"), Absent="N_N_N_N"))
 
@@ -55,19 +55,26 @@ chip_dyns_sizes = unlist(lapply(chip_dyns, function(x) length(x)))
 
 ## Save data
 ```{r}
-if(clustered_chip_groups){
-  save(chip_dyns, cols_chipdyns, file="chip_data_clustered.RData")
+response <- readline("Do you want to save the dynamics? (yes/no): ")
+if (tolower(response) == "yes") {
+  if(clustered_chip_groups){
+    save(chip_dyns, cols_chipdyns, file="chip_data_clustered.RData")
+  } else {
+    save(chip_dyns, cols_chipdyns, file="chip_data.RData")
+  }
 } else {
-  save(chip_dyns, cols_chipdyns, file="chip_data.RData")
+  print("Dynamics not saved")
 }
 ```
 
 ## Plot legend
 ```{r fig.height=6, fig.width=3}
-remove_NNNN <- TRUE
+remove_NNNN <- FALSE
 
 groups <- names(chip_dyns)
 if(remove_NNNN){groups <- groups[!groups %in% c("N_N_N_N", "Absent")]}
+
+#groups <- groups[!groups %in% c("Kept")]
 
 plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
 legend("topright", title="H3K4me3 dynamics",
@@ -210,14 +217,21 @@ transition_diff <- function(transition, type){
   violin_plot <- ggviolin(plot_df, x = "H3K4me3", y = paste(type), fill = "H3K4me3",
          add = "boxplot", add.params = list(fill = "white")) + stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(type, prev_stage))
   ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "H3K4me3") + xlab(paste(type, prev_stage))
-  grid.arrange(violin_plot, ecdf_plot, top=paste("Maintenance from", prev_stage, "to", next_stage), ncol=2)
+  arrangeGrob(violin_plot, ecdf_plot, top=paste("Maintenance from", prev_stage, "to", next_stage), ncol=2)
 }
 
 transitions <- list(c("Spermatid", "Sperm"), c("Sperm", "Pre-ZGA"), c("Pre-ZGA", "ZGA"), c("Spermatid", "ZGA"))
-res <- lapply(transitions, transition_diff, type="peak.width")
-res <- lapply(transitions, transition_diff, type="promoter.enrich")
-res <- lapply(transitions, transition_diff, type="promoter.mean")
-res <- lapply(transitions, transition_diff, type="promoter.max")
+res_width <- lapply(transitions, transition_diff, type="peak.width")
+#res_enrich <- lapply(transitions, transition_diff, type="promoter.enrich")
+res_mean <- lapply(transitions, transition_diff, type="promoter.mean")
+#res_max <- lapply(transitions, transition_diff, type="promoter.max")
+
+g <- arrangeGrob(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]], 
+                 res_mean[[1]], res_mean[[2]], res_mean[[3]], res_mean[[4]],
+                  #res_enrich[[1]], res_enrich[[2]], res_enrich[[3]], res_enrich[[4]],
+                  #res_max[[1]], res_max[[2]], res_max[[3]], res_max[[4]],
+                  ncol=4)
+ggsave(file=paste0(groups, "_maintenance.pdf"), g, width = 25, height = 6)
 ```
 
 ```{r message=FALSE, warning=FALSE}
