@@ -9,8 +9,11 @@ clustered_rna_groups = TRUE
 #rna_clustering <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
 #cols_rna_clusters <- c(GS="#1B9E77", GZ="#D95F02", ZS = "#7570B3", ND = "#666666")
 
-rna_clustering <- list(Zygotic = c("Zonly", "MZonly", "PZonly", "MPZ"), NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
-cols_rna_clusters <- c(Zygotic="#9636d1", NonZygotic="#b7eb34")
+#rna_clustering <- list(Zygotic = c("Zonly", "MZonly", "PZonly", "MPZ"), NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
+#cols_rna_clusters <- c(Zygotic="#9636d1", NonZygotic="#b7eb34")
+
+rna_clustering <- list("Expressed@6hpf" = "zga_nascent.6hpf", "Expressed@7hpf"="zga_nascent.7hpf","Expressed@8hpf"="zga_nascent.8hpf","Expressed@9hpf"="zga_nascent.9hpf", NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
+cols_rna_clusters <- c("Expressed@6hpf"="#9636d1", "Expressed@7hpf"="#f63189", "Expressed@8hpf"="#e84c51", "Expressed@9hpf"="#f96544", NonZygotic="#b7eb34")
 
 #rna_clustering <- list(PO = c("Ponly", "MPonly"), ZO = c("Zonly", "MZonly"), PZ=c("MPZ", "PZonly"), ND = c("ND", "Monly"))
 #cols_rna_clusters <- c(PO="#D95F02", ZO = "#7570B3", PZ = "#E6AB02", ND = "#666666")
@@ -68,6 +71,17 @@ zga_nascent.9hpf_lenient = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr_l
  
 zga_nascent.detected_lenient <- zga_nascent.6hpf_lenient | zga_nascent.7hpf_lenient | zga_nascent.8hpf_lenient | zga_nascent.9hpf_lenient
 zga_nascent.detected_lenient <- unique(chen[zga_nascent.detected_lenient, "name"])
+
+expression.9hpf = ((chen[,"GSM6076958"] - chen[,"GSM6076950"]) + (chen[,"GSM6076959"] - chen[,"GSM6076951"]) +
+                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) + (chen[,"GSM6076983"] - chen[,"GSM6076975"])) /4
+expression.9hpf[expression.9hpf < 0] = 0
+names(expression.9hpf) <- chen$name
+expression.9hpf <- expression.9hpf[allgenes$gene_id]
+
+zga_nascent.6hpf <- unique(chen[zga_nascent.6hpf_stringent, "name"])
+zga_nascent.7hpf <- unique(chen[zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
+zga_nascent.8hpf <- unique(chen[zga_nascent.8hpf_stringent & !zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
+zga_nascent.9hpf <- unique(chen[zga_nascent.9hpf_stringent & !zga_nascent.8hpf_stringent & !zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
 ```
 
 ###Detected genes at each stage
@@ -77,6 +91,10 @@ spermatid.detected <- spermatid.detected[spermatid.detected %in% rna_genes]
 egg.detected <- egg.detected[egg.detected %in% rna_genes]
 zga_nascent.detected_stringent <- zga_nascent.detected_stringent[zga_nascent.detected_stringent %in% rna_genes]
 zga_nascent.detected_lenient <- zga_nascent.detected_lenient[zga_nascent.detected_lenient %in% rna_genes]
+zga_nascent.6hpf <- zga_nascent.6hpf[zga_nascent.6hpf %in% rna_genes]
+zga_nascent.7hpf <- zga_nascent.7hpf[zga_nascent.7hpf %in% rna_genes]
+zga_nascent.8hpf <- zga_nascent.8hpf[zga_nascent.8hpf %in% rna_genes]
+zga_nascent.9hpf <- zga_nascent.9hpf[zga_nascent.9hpf %in% rna_genes]
 ```
 
 ##Definition of dynamic groups
@@ -107,9 +125,9 @@ rna_dyns_sizes = unlist(lapply(rna_dyns, function(x) length(x)))
 response <- readline("Do you want to save the dynamics? (yes/no): ")
 if (tolower(response) == "yes") {
   if(clustered_rna_groups){
-    save(rna_dyns, cols_rnadyns, file="rna_data_clustered.RData")
+    save(rna_dyns, cols_rnadyns, expression.9hpf, file="rna_data_clustered.RData")
   } else {
-    save(rna_dyns, cols_rnadyns, file="rna_data.RData")
+    save(rna_dyns, cols_rnadyns, expression.9hpf, file="rna_data.RData")
   }
 } else {
   print("Dynamics not saved")
@@ -121,12 +139,12 @@ if (tolower(response) == "yes") {
 ```{r}
 remove_ND <- TRUE
 
-groups <- names(rna_dyns)
-if(remove_ND){groups <- groups[!groups %in% c("ND")]}
+groups_rna <- names(rna_dyns)
+if(remove_ND){groups_rna <- groups_rna[!groups_rna %in% c("ND")]}
 
 plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
 legend("topright", title="RNA dynamics",
-   groups, fill=cols_rnadyns[groups], horiz=FALSE)
+   groups_rna, fill=cols_rnadyns[groups_rna], horiz=FALSE)
 
 library(eulerr)
 if(clustered_rna_groups){

@@ -40,8 +40,11 @@ Y_N_Y_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_
 Y_N_N_Y = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-0-1
 Y_N_N_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-0-0
 
+get_dyns <- function(cluster){
+    lists = as.vector(unlist(sapply(cluster, function(dyn_name){get(dyn_name)}, simplify = TRUE), use.names = FALSE))}
+
 if(clustered_chip_groups){
-  chip_dyns <- lapply(chip_clustering, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
+  chip_dyns <- lapply(chip_clustering, get_dyns)
   cols_chipdyns <- cols_clustered
 } else {
   cols_chipdyns <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), chip_names_complete)
