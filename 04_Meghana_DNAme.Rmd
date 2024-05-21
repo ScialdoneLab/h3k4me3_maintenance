@@ -22,8 +22,12 @@ promoters_chr <- promoters[seqnames(promoters) %in% chr]
 ##Utility functions
 ```{r}
 suppressPackageStartupMessages(library(EnrichedHeatmap))
-enrichment <- function(coverage, title){
-  coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")#, value_column = "score")
+enrichment <- function(coverage, title, mode="ranges"){
+  if(mode=="ranges"){
+    coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
+  } else if(mode=="coverage"){
+    coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage", value_column = "score")
+  }
   coverage <- log2(coverage+1)
   hm <- EnrichedHeatmap(coverage, 
                         name = "H3K4me3 enrichment",
@@ -33,6 +37,22 @@ enrichment <- function(coverage, title){
   draw(hm)
   return(enriched_score(coverage))
 }
+```
+
+##Load DNAme Spermatid
+```{r message=FALSE, warning=FALSE}
+setwd("/Users/marcostock/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_mbd")
+
+#IP coverage replicates
+spermatid_cov1 <- as(readRDS("GSM1944470_coverage.rds"), "GRanges")
+spermatid_cov2 <- as(readRDS("GSM1944471_coverage.rds"), "GRanges")
+spermatid_cov3 <- as(readRDS("GSM1944472_coverage.rds"), "GRanges")
+spermatid_cov <- c(spermatid_cov1, spermatid_cov2, spermatid_cov3)
+
+#Delete individual replicates
+rm(spermatid_cov1, spermatid_cov2, spermatid_cov3)
+
+DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage")
 ```
 
 ##Load DNAme Sperm
@@ -118,6 +138,6 @@ cg_density <- cg_density[allgenes$gene_id]
 
 ##Save data
 ```{r}
-save(DNAme_sperm, DNAme_prezga, DamID_prezga, cg_density, file="epi_data.RData")
+save(DNAme_spermatid, DNAme_sperm, DNAme_prezga, DamID_prezga, cg_density, file="epi_data.RData")
 ```
 

@@ -18,11 +18,15 @@ if(clustered_groups){
 load("h3k4me3_data_sperm_Oikawa.RData")
 load("epi_data.RData")
 
-chip_dfs[["ZGA"]]$expression.9hpf <- log(expression.9hpf + 1)
-chip_dfs[["Pre-ZGA"]]$promoter.dna.methyl <- DNAme_prezga
+chip_dfs[["Spermatid"]]$cg.density <- unname(cg_density[allgenes$gene_id])
+chip_dfs[["Spermatid"]]$promoter.dna.methyl <- DNAme_spermatid
 chip_dfs[["Sperm"]]$promoter.dna.methyl <- DNAme_sperm
+chip_dfs[["Pre-ZGA"]]$promoter.dna.methyl <- DNAme_prezga
 chip_dfs[["Pre-ZGA"]]$promoter.accessibility <- DamID_prezga
-chip_dfs[["Sperm"]]$cg.density <- cg_density[allgenes$gene_id]
+chip_dfs[["ZGA"]]$expression.6hpf <- log(expression.data[["6hpf"]] + 1)
+chip_dfs[["ZGA"]]$expression.7hpf <- log(expression.data[["7hpf"]] + 1)
+chip_dfs[["ZGA"]]$expression.8hpf <- log(expression.data[["8hpf"]] + 1)
+chip_dfs[["ZGA"]]$expression.9hpf <- log(expression.data[["9hpf"]] + 1)
 ```
 
 ## Balloon plot
@@ -147,7 +151,7 @@ plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE, legend
     cols = cols_rnadyns
     dyn = rna_dyns
   } else if(groups == "chip"){
-    onlypeaks=TRUE
+    if(type %in% c("peak.width", "promoter.enrich", "promoter.mean", "promoter.max")){onlypeaks=TRUE}
     cols = cols_chipdyns
     dyn = chip_dyns
   }
@@ -169,7 +173,7 @@ plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE, legend
 }
 
 
-res_width = lapply(stages, plot_stage_dynamics, type="peak.width", "groups")
+res_width = lapply(stages, plot_stage_dynamics, type="peak.width", groups)
 #res_enrich = lapply(stages, plot_stage_dynamics, type="promoter.enrich", groups)
 res_mean = lapply(stages, plot_stage_dynamics, type="promoter.mean", groups)
 #res_max = lapply(stages, plot_stage_dynamics, type="promoter.max", groups)
@@ -182,12 +186,16 @@ g <- arrangeGrob(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]],
 ggsave(file=paste0(groups, "_dynamics.pdf"), g, width = 25, height = 6)
 ```
 
-```{r}
+```{r fig.height=5, fig.width=10}
+plot(plot_stage_dynamics("ZGA", type="expression.6hpf", groups, legend=TRUE))
+plot(plot_stage_dynamics("ZGA", type="expression.7hpf", groups, legend=TRUE))
+plot(plot_stage_dynamics("ZGA", type="expression.8hpf", groups, legend=TRUE))
 plot(plot_stage_dynamics("ZGA", type="expression.9hpf", groups, legend=TRUE))
 plot(plot_stage_dynamics("Pre-ZGA", type="promoter.dna.methyl", groups, legend=TRUE))
 plot(plot_stage_dynamics("Pre-ZGA", type="promoter.accessibility", groups, legend=TRUE))
 plot(plot_stage_dynamics("Sperm", type="promoter.dna.methyl", groups, legend=TRUE))
 plot(plot_stage_dynamics("Sperm", type="cg.density", groups, legend=TRUE))
+plot(plot_stage_dynamics("Spermatid", type="promoter.dna.methyl", groups, legend=TRUE))
 ```
 
 
@@ -320,6 +328,7 @@ label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns
 
 heatmap_data <- data.frame("Spermatid.peak.width" = chip_dfs[["Spermatid"]][,c("peak.width")],
                            "Spermatid.promoter.mean" = chip_dfs[["Spermatid"]][,c("promoter.mean")],
+                           "Spermatid.promoter.dna.methyl" = chip_dfs[["Spermatid"]][,c("promoter.dna.methyl")],
                            "Sperm.peak.width" = chip_dfs[["Sperm"]][,c("peak.width")],
                            "Sperm.promoter.mean" = chip_dfs[["Sperm"]][,c("promoter.mean")],
                            "Sperm.promoter.dna.methyl" = chip_dfs[["Sperm"]][,c("promoter.dna.methyl")],
@@ -330,6 +339,9 @@ heatmap_data <- data.frame("Spermatid.peak.width" = chip_dfs[["Spermatid"]][,c("
                            "ZGA.peak.width" = chip_dfs[["ZGA"]][,c("peak.width")],
                            "ZGA.promoter.mean" = chip_dfs[["ZGA"]][,c("promoter.mean")],
                            "ZGA.expression.9hpf" = chip_dfs[["ZGA"]][,c("expression.9hpf")],
+                           "ZGA.expression.8hpf" = chip_dfs[["ZGA"]][,c("expression.8hpf")],
+                           "ZGA.expression.7hpf" = chip_dfs[["ZGA"]][,c("expression.7hpf")],
+                           "ZGA.expression.6hpf" = chip_dfs[["ZGA"]][,c("expression.6hpf")],
                            "CG.density" = chip_dfs[["Sperm"]][,c("cg.density")],
                            "RNA.group" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns),
                            "Chip.group" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns))
@@ -376,14 +388,54 @@ draw(hm_chip)
 
 ```
 
-```{r}
+```{r fig.height=10, fig.width=10}
 library(corrplot)
 df <- heatmap_data[,!colnames(heatmap_data) %in% c("RNA.group", "Chip.group")]
 df <- na.omit(df)
 
-corrplot(cor(df, method="spearman"),
+corrplot(cor(df, method="pearson"),
          method = "color",       
          order = "hclust",
          tl.col	= "black")
+```
+
+```{r}
+#library("FactoMineR")
+library("factoextra")
+only_prezga = TRUE
+
+complete_data <- heatmap_data
+if(only_prezga){
+  pca_input <- complete_data[,colnames(complete_data) %in% c("Pre.ZGA.promoter.mean", "Pre.ZGA.peak.width", "Pre.ZGA.promoter.dna.methyl", "Pre.ZGA.promoter.accessibility")]
+} else {
+  pca_input <- complete_data[,!colnames(complete_data) %in% c("RNA.group", "Chip.group")]
+}
+df <- na.omit(pca_input)
+  
+if(groups=="chip"){
+  color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"Chip.group"]
+  cols = cols_chipdyns
+}else if(groups=="rna"){
+  color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"RNA.group"]
+  cols = cols_rnadyns
+}
+
+data.pca <- princomp(scale(df), cor=TRUE)
+#summary(data.pca)
+fviz_eig(data.pca, addlabels = TRUE)
+fviz_contrib(data.pca, choice = "var", axes = 1:2)
+fviz_pca_var(data.pca, col.var = "contrib",
+            gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+            repel = TRUE)
+fviz_pca_ind(data.pca,
+             col.ind = color.groups, 
+             palette = cols,
+             label="none",
+             pointsize = 0.5,
+             addEllipses = TRUE, # Concentration ellipses
+             ellipse.type = "norm",
+             legend.title = "Dynamics"
+             )
+
 ```
 

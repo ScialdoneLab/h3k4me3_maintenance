@@ -47,36 +47,43 @@ chen <- chen[!duplicated(chen$name),]
  
 egg.detected <- chen[chen[,"GSM6076970"] > G_thr & chen[,"GSM6076971"] > G_thr, "name"]
 egg.detected <- unique(egg.detected)
- 
-zga_nascent.6hpf_stringent = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > Z_thr &     
-                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > Z_thr
-zga_nascent.7hpf_stringent = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > Z_thr & 
-                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > Z_thr
-zga_nascent.8hpf_stringent = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > Z_thr &
-                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > Z_thr
-zga_nascent.9hpf_stringent = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr & (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > Z_thr & 
-                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > Z_thr & (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > Z_thr
- 
-zga_nascent.detected_stringent <- zga_nascent.6hpf_stringent | zga_nascent.7hpf_stringent | zga_nascent.8hpf_stringent | zga_nascent.9hpf_stringent
-zga_nascent.detected_stringent <- unique(chen[zga_nascent.detected_stringent, "name"])
- 
-zga_nascent.6hpf_lenient = (chen[,"GSM6076952"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076953"] - chen[,"GSM6076951"]) > Z_thr_lenient |     
-                    (chen[,"GSM6076976"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076977"] - chen[,"GSM6076975"]) > Z_thr_lenient
-zga_nascent.7hpf_lenient = (chen[,"GSM6076954"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076955"] - chen[,"GSM6076951"]) > Z_thr_lenient | 
-                    (chen[,"GSM6076978"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076979"] - chen[,"GSM6076975"]) > Z_thr_lenient
-zga_nascent.8hpf_lenient = (chen[,"GSM6076956"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076957"] - chen[,"GSM6076951"]) > Z_thr_lenient |
-                    (chen[,"GSM6076980"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076981"] - chen[,"GSM6076975"]) > Z_thr_lenient
-zga_nascent.9hpf_lenient = (chen[,"GSM6076958"] - chen[,"GSM6076950"]) > Z_thr_lenient | (chen[,"GSM6076959"] - chen[,"GSM6076951"]) > Z_thr_lenient | 
-                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) > Z_thr_lenient | (chen[,"GSM6076983"] - chen[,"GSM6076975"]) > Z_thr_lenient
- 
-zga_nascent.detected_lenient <- zga_nascent.6hpf_lenient | zga_nascent.7hpf_lenient | zga_nascent.8hpf_lenient | zga_nascent.9hpf_lenient
-zga_nascent.detected_lenient <- unique(chen[zga_nascent.detected_lenient, "name"])
 
-expression.9hpf = ((chen[,"GSM6076958"] - chen[,"GSM6076950"]) + (chen[,"GSM6076959"] - chen[,"GSM6076951"]) +
-                    (chen[,"GSM6076982"] - chen[,"GSM6076974"]) + (chen[,"GSM6076983"] - chen[,"GSM6076975"])) /4
-expression.9hpf[expression.9hpf < 0] = 0
-names(expression.9hpf) <- chen$name
-expression.9hpf <- expression.9hpf[allgenes$gene_id]
+get_detected_genes <- function(rep1, rep2, rep3, rep4, stringent=FALSE){
+  if(stringent){thresh = Z_thr}else{thresh = Z_thr_lenient}
+  rep1_detected = (chen[,rep1] - chen[,"GSM6076950"]) > thresh
+  rep2_detected = (chen[,rep2] - chen[,"GSM6076951"]) > thresh
+  rep3_detected = (chen[,rep3] - chen[,"GSM6076974"]) > thresh
+  rep4_detected = (chen[,rep4] - chen[,"GSM6076975"]) > thresh
+  if(stringent){
+    detected = rep1_detected & rep2_detected & rep3_detected & rep4_detected
+  } else {
+    detected = rep1_detected | rep2_detected | rep3_detected | rep4_detected
+  }
+}
+get_zga_genes <- function(stringent=FALSE){
+  zga_nascent.6hpf <- get_detected_genes(rep1="GSM6076952", rep2="GSM6076953", rep3="GSM6076976", rep4="GSM6076977", stringent=stringent)
+  zga_nascent.7hpf <- get_detected_genes(rep1="GSM6076954", rep2="GSM6076955", rep3="GSM6076978", rep4="GSM6076979", stringent=stringent)
+  zga_nascent.8hpf <- get_detected_genes(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM6076980", rep4="GSM6076981", stringent=stringent)
+  zga_nascent.9hpf <- get_detected_genes(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983", stringent=stringent)
+  zga_nascent.detected <- zga_nascent.6hpf | zga_nascent.7hpf | zga_nascent.8hpf | zga_nascent.9hpf
+  return(unique(chen[zga_nascent.detected, "name"]))
+}
+ 
+zga_nascent.detected_stringent <- get_zga_genes(stringent = TRUE)
+zga_nascent.detected_lenient <- get_zga_genes(stringent = FALSE)
+
+get_expression <- function(rep1, rep2, rep3, rep4){
+  mean_expression = (pmax(chen[,rep1] - chen[,"GSM6076950"], 0) + pmax(chen[,rep2] - chen[,"GSM6076951"], 0) +
+                    pmax(chen[,rep3] - chen[,"GSM6076974"], 0) + pmax(chen[,rep4] - chen[,"GSM6076975"], 0)) /4
+  names(mean_expression) <- chen$name
+  return(mean_expression[allgenes$gene_id])
+}
+
+expression.6hpf = get_expression(rep1="GSM6076952", rep2="GSM6076953", rep3="GSM6076976", rep4="GSM6076977")
+expression.7hpf = get_expression(rep1="GSM6076954", rep2="GSM6076955", rep3="GSM6076978", rep4="GSM6076979")
+expression.8hpf = get_expression(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM6076980", rep4="GSM6076981")
+expression.9hpf = get_expression(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983")
+expression.data = list("6hpf"=expression.6hpf, "7hpf"=expression.7hpf, "8hpf"=expression.8hpf, "9hpf"=expression.9hpf)
 
 zga_nascent.6hpf <- unique(chen[zga_nascent.6hpf_stringent, "name"])
 zga_nascent.7hpf <- unique(chen[zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
@@ -125,9 +132,9 @@ rna_dyns_sizes = unlist(lapply(rna_dyns, function(x) length(x)))
 response <- readline("Do you want to save the dynamics? (yes/no): ")
 if (tolower(response) == "yes") {
   if(clustered_rna_groups){
-    save(rna_dyns, cols_rnadyns, expression.9hpf, file="rna_data_clustered.RData")
+    save(rna_dyns, cols_rnadyns, expression.data, file="rna_data_clustered.RData")
   } else {
-    save(rna_dyns, cols_rnadyns, expression.9hpf, file="rna_data.RData")
+    save(rna_dyns, cols_rnadyns, expression.data, file="rna_data.RData")
   }
 } else {
   print("Dynamics not saved")
