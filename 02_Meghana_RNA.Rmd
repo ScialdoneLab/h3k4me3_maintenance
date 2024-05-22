@@ -60,17 +60,26 @@ get_detected_genes <- function(rep1, rep2, rep3, rep4, stringent=FALSE){
     detected = rep1_detected | rep2_detected | rep3_detected | rep4_detected
   }
 }
-get_zga_genes <- function(stringent=FALSE){
+get_zga_genes <- function(stringent=FALSE, total=TRUE){
   zga_nascent.6hpf <- get_detected_genes(rep1="GSM6076952", rep2="GSM6076953", rep3="GSM6076976", rep4="GSM6076977", stringent=stringent)
   zga_nascent.7hpf <- get_detected_genes(rep1="GSM6076954", rep2="GSM6076955", rep3="GSM6076978", rep4="GSM6076979", stringent=stringent)
   zga_nascent.8hpf <- get_detected_genes(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM6076980", rep4="GSM6076981", stringent=stringent)
   zga_nascent.9hpf <- get_detected_genes(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983", stringent=stringent)
   zga_nascent.detected <- zga_nascent.6hpf | zga_nascent.7hpf | zga_nascent.8hpf | zga_nascent.9hpf
-  return(unique(chen[zga_nascent.detected, "name"]))
+  
+  if(total){return(unique(chen[zga_nascent.detected, "name"]))}
+  else{
+    zga_nascent.6hpf.detected <- unique(chen[zga_nascent.6hpf, "name"])
+    zga_nascent.7hpf.detected <- unique(chen[zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    zga_nascent.8hpf.detected <- unique(chen[zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    zga_nascent.9hpf.detected <- unique(chen[zga_nascent.9hpf & !zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    list("6hpf"=zga_nascent.6hpf.detected, "7hpf"=zga_nascent.7hpf.detected, 
+                   "8hpf"=zga_nascent.8hpf.detected, "9hpf"=zga_nascent.9hpf.detected)
+  }
 }
  
-zga_nascent.detected_stringent <- get_zga_genes(stringent = TRUE)
-zga_nascent.detected_lenient <- get_zga_genes(stringent = FALSE)
+zga_nascent.detected_stringent <- get_zga_genes(stringent = TRUE, total=TRUE)
+zga_nascent.detected_lenient <- get_zga_genes(stringent = FALSE, total=TRUE)
 
 get_expression <- function(rep1, rep2, rep3, rep4){
   mean_expression = (pmax(chen[,rep1] - chen[,"GSM6076950"], 0) + pmax(chen[,rep2] - chen[,"GSM6076951"], 0) +
@@ -85,10 +94,11 @@ expression.8hpf = get_expression(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM
 expression.9hpf = get_expression(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983")
 expression.data = list("6hpf"=expression.6hpf, "7hpf"=expression.7hpf, "8hpf"=expression.8hpf, "9hpf"=expression.9hpf)
 
-zga_nascent.6hpf <- unique(chen[zga_nascent.6hpf_stringent, "name"])
-zga_nascent.7hpf <- unique(chen[zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
-zga_nascent.8hpf <- unique(chen[zga_nascent.8hpf_stringent & !zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
-zga_nascent.9hpf <- unique(chen[zga_nascent.9hpf_stringent & !zga_nascent.8hpf_stringent & !zga_nascent.7hpf_stringent & !zga_nascent.6hpf_stringent, "name"])
+zga_nascent.stages <- get_zga_genes(stringent = TRUE, total=FALSE)
+zga_nascent.6hpf <- zga_nascent.stages[["6hpf"]]
+zga_nascent.7hpf <- zga_nascent.stages[["7hpf"]]
+zga_nascent.8hpf <- zga_nascent.stages[["8hpf"]]
+zga_nascent.9hpf <- zga_nascent.stages[["9hpf"]]
 ```
 
 ###Detected genes at each stage
