@@ -5,15 +5,22 @@ output: html_notebook
 
 ## Settings
 ```{r}
-clustered_chip_groups <- TRUE
+clustered_chip_groups <- FALSE
 
-#chip_clustering <- list("Kept" = "Y_Y_Y_Y", "RecoveredLate"="Y_Y_N_Y", "RecoveredEarly"="Y_N_Y_Y", "RecoveredLong"="Y_N_N_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N")
-#cols_clustered = setNames(c("#6ca239","#6bc7ab", "#c2ffd3", "#004414","#f2c237","#e17e39","#b73a2f","#5f91c1","#3b4ca8","grey"), names(chip_clustering))
+if(clustered_chip_groups){
+  chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"), Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+  cols_clustered = setNames(c("#DDAA33", "#228833","#BB5566", "#004488", "#DDDDDD"), names(chip_clustering))
+} else {
+  chip_clustering <- list("Kept" = "Y_Y_Y_Y", "RecoveredLate"="Y_Y_N_Y", "RecoveredEarly"="Y_N_Y_Y", "RecoveredLong"="Y_N_N_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N")
+  cols_clustered = setNames(c("#DDCC77","#009988", "#44BB99", "#228833","#CC6677","#882255","#AA4499","#332288", "#88CCEE","#DDDDDD"), names(chip_clustering))
+}
 
-chip_clustering <- list(Kept = "Y_Y_Y_Y", Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"), Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
-cols_clustered = setNames(c("#6ca239","#f2c237","#b73a2f", "#3b4ca8", "grey"), names(chip_clustering))
+#Blood contimation GO plots
+#chip_clustering <- list(N_Y_ = c("N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"))
 
-#chip_clustering <- list(N_Y_ = "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"), Y_Y_ = c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N"), Y_N_ = c("Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N"), Absent="N_N_N_N"))
+#All groups
+#chip_clustering <- setNames(list(Y_Y_Y_Y, Y_Y_Y_N, Y_Y_N_Y, Y_Y_N_N, Y_N_Y_Y, Y_N_Y_N, Y_N_N_Y, Y_N_N_N, N_Y_Y_Y, N_Y_Y_N, N_Y_N_Y, N_Y_N_N, N_N_Y_Y, N_N_Y_N, N_N_N_Y, N_N_N_N), chip_names_complete)
+#cols_clustered <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), chip_names_complete)
 
 load("h3k4me3_data_sperm_Oikawa.RData")
 ```
@@ -43,14 +50,9 @@ Y_N_N_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip
 get_dyns <- function(cluster){
     lists = as.vector(unlist(sapply(cluster, function(dyn_name){get(dyn_name)}, simplify = TRUE), use.names = FALSE))}
 
-if(clustered_chip_groups){
-  chip_dyns <- lapply(chip_clustering, get_dyns)
-  cols_chipdyns <- cols_clustered
-} else {
-  cols_chipdyns <- setNames(c("#ece0d3","#a6afb7","#937c65","#625c5a","#be8162","#713725","#b73a2f","#e17e39","#f2c237","#6ca239","#36753d","#3b4ca8","#5f91c1","#6bc7ab","#d0589f","#8d55ae"), chip_names_complete)
-  chip_dyns <- setNames(list(Y_Y_Y_Y, Y_Y_Y_N, Y_Y_N_Y, Y_Y_N_N, Y_N_Y_Y, Y_N_Y_N, Y_N_N_Y, Y_N_N_N,
-N_Y_Y_Y, N_Y_Y_N, N_Y_N_Y, N_Y_N_N, N_N_Y_Y, N_N_Y_N, N_N_N_Y, N_N_N_N), chip_names_complete)
-}
+chip_dyns <- lapply(chip_clustering, get_dyns)
+cols_chipdyns <- cols_clustered
+
 chip_dyns_complete <- setNames(list(Y_Y_Y_Y, Y_Y_Y_N, Y_Y_N_Y, Y_Y_N_N, Y_N_Y_Y, Y_N_Y_N, Y_N_N_Y, Y_N_N_N,
 N_Y_Y_Y, N_Y_Y_N, N_Y_N_Y, N_Y_N_N, N_N_Y_Y, N_N_Y_N, N_N_N_Y, N_N_N_N), chip_names_complete)
 chip_dyns_sizes = unlist(lapply(chip_dyns, function(x) length(x)))
@@ -71,7 +73,7 @@ if (tolower(response) == "yes") {
 ```
 
 ## Plot legend
-```{r fig.height=6, fig.width=3}
+```{r fig.height=3, fig.width=10}
 remove_NNNN <- FALSE
 
 groups <- names(chip_dyns)
@@ -79,24 +81,24 @@ if(remove_NNNN){groups <- groups[!groups %in% c("N_N_N_N", "Absent")]}
 
 #groups <- groups[!groups %in% c("Kept")]
 
-plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
-legend("topright", title="H3K4me3 dynamics",
-groups, fill=cols_chipdyns[groups], horiz=FALSE)
+pdf(file="chip_legend.pdf", width=10, height=3)
+plot.new()
+#plot(NULL, ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("center", title="H3K4me3", bty = "n",
+groups, fill=cols_chipdyns[groups], ncol = 5)
+dev.off()
+
 ```
 
 ##Venn diagram of H3K4me3 dynamics
 ```{r}
 library(eulerr)
-if(clustered_chip_groups){
-  euler_cols <- setNames(rep("#d3d3d3", 16), chip_names_complete)
-  for(i in 1:length(chip_clustering)){
-    cluster <- chip_clustering[[i]]
-    for(dynamic in cluster){
-      euler_cols[dynamic]=cols_chipdyns[names(chip_clustering)[i]]
-    }
+euler_cols <- setNames(rep("#FFFFFF", 16), chip_names_complete)
+for(i in 1:length(chip_clustering)){
+  cluster <- chip_clustering[[i]]
+  for(dynamic in cluster){
+    euler_cols[dynamic]=cols_chipdyns[names(chip_clustering)[i]]
   }
-} else {
-  euler_cols <- cols_chipdyns
 }
 plot(euler(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
            "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
@@ -111,6 +113,13 @@ plot(venn(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=leng
       "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
       "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
      quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
+```
+```{r fig.height=5, fig.width=2}
+
+ggplot(data.frame("sizes"=chip_dyns_sizes, "dyn"=names(chip_dyns_sizes), "id"=1), aes(fill=dyn, y=sizes, x=id)) + 
+    geom_bar(position="fill", stat="identity", fill=cols_chipdyns) + theme_pubr() + ylab("Ratio of genome") + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
 ```
 
 
@@ -152,7 +161,7 @@ plot_alluvial <- function(remove_NNNN, remove_YYYY){
     geom_stratum(width = 1/12, fill = "grey", color = "black", alpha = .75) +
     geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
     scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
-    scale_fill_manual(values=euler_cols)
+    scale_fill_manual(values=euler_cols) + guides(fill="none")
 }
 
 plot_alluvial(remove_NNNN = FALSE, remove_YYYY = FALSE)
@@ -201,7 +210,8 @@ for (i in 1:length(chip_dyns)){
 ```
 ```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
 p_adj = 0.01
-go_list <- lapply(chip_dyns, go_enrichment)
+go_dyns <- chip_dyns[!names(chip_dyns) %in% c("Absent", "N_N_N_N")]
+go_list <- lapply(go_dyns, go_enrichment)
 go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
 go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
@@ -218,8 +228,10 @@ transition_diff <- function(transition, type){
                                                                                     chip_dfs[[prev_stage]][genes_prev, type])
   colnames(plot_df) <- c("Gene", "H3K4me3", type)
   violin_plot <- ggviolin(plot_df, x = "H3K4me3", y = paste(type), fill = "H3K4me3",
-         add = "boxplot", add.params = list(fill = "white")) + stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(type, prev_stage))
-  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "H3K4me3") + xlab(paste(type, prev_stage))
+         add = "boxplot", add.params = list(fill = "white")) + stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(axis_titles[[type]], "in", prev_stage)) + guides(fill = "none") +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))
+  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "H3K4me3") + xlab(paste(axis_titles[[type]], "in", prev_stage)) + guides(color = "none") +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))
   arrangeGrob(violin_plot, ecdf_plot, top=paste("Maintenance from", prev_stage, "to", next_stage), ncol=2)
 }
 
@@ -234,7 +246,7 @@ g <- arrangeGrob(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]],
                   #res_enrich[[1]], res_enrich[[2]], res_enrich[[3]], res_enrich[[4]],
                   #res_max[[1]], res_max[[2]], res_max[[3]], res_max[[4]],
                   ncol=4)
-ggsave(file=paste0(groups, "_maintenance.pdf"), g, width = 25, height = 6)
+ggsave(file=paste0("chip_stage_maintenance.pdf"), g, width = 25, height = 6)
 ```
 
 ```{r message=FALSE, warning=FALSE}

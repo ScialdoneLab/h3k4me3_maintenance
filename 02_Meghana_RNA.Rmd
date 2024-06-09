@@ -7,16 +7,18 @@ output: html_notebook
 ```{r}
 clustered_rna_groups = TRUE
 #rna_clustering <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
-#cols_rna_clusters <- c(GS="#1B9E77", GZ="#D95F02", ZS = "#7570B3", ND = "#666666")
+#cols_rna_clusters <- c(GS="#009988", GZ="#EE7733", ZS = "#6699CC", ND = "#666666")
 
-#rna_clustering <- list(Zygotic = c("Zonly", "MZonly", "PZonly", "MPZ"), NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
-#cols_rna_clusters <- c(Zygotic="#9636d1", NonZygotic="#b7eb34")
+#rna_clustering <- list("Zygotic" = c("Zonly", "MZonly", "PZonly", "MPZ"), "Non-Zygotic" = c("Monly", "Ponly", "MPonly", "ND"))
+#cols_rna_clusters <- c("Zygotic"="#5D3A9B", "Non-Zygotic"="#E66100")
 
 rna_clustering <- list("Expressed@6hpf" = "zga_nascent.6hpf", "Expressed@7hpf"="zga_nascent.7hpf","Expressed@8hpf"="zga_nascent.8hpf","Expressed@9hpf"="zga_nascent.9hpf", NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
 cols_rna_clusters <- c("Expressed@6hpf"="#9636d1", "Expressed@7hpf"="#f63189", "Expressed@8hpf"="#e84c51", "Expressed@9hpf"="#f96544", NonZygotic="#b7eb34")
 
 #rna_clustering <- list(PO = c("Ponly", "MPonly"), ZO = c("Zonly", "MZonly"), PZ=c("MPZ", "PZonly"), ND = c("ND", "Monly"))
 #cols_rna_clusters <- c(PO="#D95F02", ZO = "#7570B3", PZ = "#E6AB02", ND = "#666666")
+
+load("h3k4me3_data_sperm_Oikawa.RData")
 ```
 
 ## Load Teperek TPM
@@ -69,9 +71,9 @@ get_zga_genes <- function(stringent=FALSE, total=TRUE){
   
   if(total){return(unique(chen[zga_nascent.detected, "name"]))}
   else{
-    zga_nascent.6hpf.detected <- unique(chen[zga_nascent.6hpf, "name"])
-    zga_nascent.7hpf.detected <- unique(chen[zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
-    zga_nascent.8hpf.detected <- unique(chen[zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    zga_nascent.6hpf.detected <- unique(chen[zga_nascent.9hpf & zga_nascent.8hpf & zga_nascent.7hpf & zga_nascent.6hpf, "name"])
+    zga_nascent.7hpf.detected <- unique(chen[zga_nascent.9hpf & zga_nascent.8hpf & zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    zga_nascent.8hpf.detected <- unique(chen[zga_nascent.9hpf & zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
     zga_nascent.9hpf.detected <- unique(chen[zga_nascent.9hpf & !zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
     list("6hpf"=zga_nascent.6hpf.detected, "7hpf"=zga_nascent.7hpf.detected, 
                    "8hpf"=zga_nascent.8hpf.detected, "9hpf"=zga_nascent.9hpf.detected)
@@ -154,7 +156,7 @@ if (tolower(response) == "yes") {
 
 ##Venn diagram of RNA dynamics
 ```{r}
-remove_ND <- TRUE
+remove_ND <- FALSE
 
 groups_rna <- names(rna_dyns)
 if(remove_ND){groups_rna <- groups_rna[!groups_rna %in% c("ND")]}
@@ -212,11 +214,14 @@ tpms_ct <- replace(tpms_ct, is.na(tpms_ct), 0)
 ###RNA groups heatmap
 ```{r, fig.width=6, fig.height=8}
 library(ComplexHeatmap)
-cols_biscale <- c("lightgoldenrod1", "chocolate3", "firebrick4")
+library(circlize)
+cols_biscale = colorRamp2(seq(0,7,7/5), c("#ffffd4", "#fee391", "#fec44f", "#fe9929", "#d95f0e", "#993404"))
 remove_ND <- TRUE
 
 tpms_ct_plot <- tpms_ct
-if(remove_ND){tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND"),]}
+if(remove_ND){
+  tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND"),]
+  tpms_ct_plot$Category <- factor(tpms_ct_plot$Category)}
 
 hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
 
@@ -239,23 +244,26 @@ draw(h1)
 ```{r}
 library(tidyr)
 library(ggplot2)
-remove_ND <- FALSE
+library(ggpubr)
+
+remove_ND <- TRUE
+remove_gametes <- TRUE
 
 tpms_ct_plot <- tpms_ct
-if(remove_ND){tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND"),]}
-bp_data <- tpms_ct_plot %>% pivot_longer(cols=c("Spermatid", "Egg", "T6hpf", "T7hpf", "T8hpf", "T9hpf"), names_to='Time', values_to='Expression')
+if(remove_ND){
+  tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND", "NonZygotic"),]
+  tpms_ct_plot$Category <- factor(tpms_ct_plot$Category)}
 
+hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
+plot_data <- data.frame(cbind(as.vector(tpms_ct_plot$Category), hm_values.log))
+colnames(plot_data)[1] <- "Category"
+plot_data <- pivot_longer(plot_data, cols=c("Spermatid", "Egg", "T6hpf", "T7hpf", "T8hpf", "T9hpf"), names_to='Time', values_to='Expression')
+#plot_data$Category <- factor(plot_data$Category, levels=c("GS", "GZ", "ZS", "ND"))
+plot_data$Expression <- as.numeric(plot_data$Expression)
+plot_data$Time <- factor(plot_data$Time)
+if(remove_gametes){plot_data <- plot_data[!plot_data$Time %in% c("Egg", "Spermatid"),]}
 
-boxes <- ggplot(bp_data, aes(x=Time, y=log2(Expression+1), fill=Category)) + 
-  geom_boxplot() + 
-  scale_fill_manual(values=cols_rnadyns) +
-  theme_minimal() + 
-  labs(y = "log2(TPM+1)") +  
-  facet_wrap(~Category, scale="free", ncol = 4) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4")
-boxes
-#ggsave(boxes, file = "/Users/meghana.oak/Documents/EPIGRS_PhD/NGS_data_sorted/Plots/Fig2/iv_RNAGenegroups_Boxplots.tiff", width = 22, height = 12, units = "cm")
+ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", add.params = list(fill = "white")) + labs(y = "log2(TPM+1)") +  theme_pubr() + scale_fill_manual(values=cols_rnadyns) + facet_wrap(~Category, scale="fixed", ncol = 4) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4") + theme(legend.title=element_blank())
 ```
 
 ###GO analysis on each gene group
@@ -288,15 +296,17 @@ for (i in 1:length(rna_dyns)){
 ```
 
 ```{r message=FALSE, warning=FALSE}
-for (i in 1:length(rna_dyns)){
-  enrichGO <- go_enrichment(rna_dyns[[i]])
+go_dyns <- rna_dyns[!names(rna_dyns) %in% c("ND")]
+for (i in 1:length(go_dyns)){
+  enrichGO <- go_enrichment(go_dyns[[i]])
   hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
   if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(rna_dyns[i]))}
 }
 ```
 ```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
 p_adj = 0.01
-go_list <- lapply(rna_dyns, go_enrichment)
+go_dyns <- rna_dyns[!names(rna_dyns) %in% c("ND")]
+go_list <- lapply(go_dyns, go_enrichment)
 go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
 go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")

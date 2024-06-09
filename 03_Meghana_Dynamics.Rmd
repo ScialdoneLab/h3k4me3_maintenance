@@ -27,10 +27,12 @@ chip_dfs[["ZGA"]]$expression.6hpf <- log(expression.data[["6hpf"]] + 1)
 chip_dfs[["ZGA"]]$expression.7hpf <- log(expression.data[["7hpf"]] + 1)
 chip_dfs[["ZGA"]]$expression.8hpf <- log(expression.data[["8hpf"]] + 1)
 chip_dfs[["ZGA"]]$expression.9hpf <- log(expression.data[["9hpf"]] + 1)
+
+axis_titles = list("peak.width" = "Peak breadth", "promoter.mean" = "Peak mean", "expression.6hpf"="RNA expression at 6hpf [log]", "expression.7hpf"="RNA expression at 7hpf [log]", "expression.8hpf"="RNA expression at 8hpf [log]", "expression.9hpf"="RNA expression at 9hpf [log]")
 ```
 
 ## Balloon plot
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, fig.height=3, fig.width=5}
 library(ggpubr)
 
 plot_balloonplot <- function(remove_ND_NNNN){
@@ -76,21 +78,20 @@ plot_balloonplot <- function(remove_ND_NNNN){
   #rna_clust<-hclust(rna_dist, method='complete')
   
   #p_mat <- p_mat[h3k4me3_clust$order, rna_clust$order]
-  
-  p_mat[p_mat < (-log10(0.01))] <- NA
+  p_mat[p_mat < (-log10(1e-2))] <- NA
   #p_mat <- p_mat[rowSums(is.na(p_mat)) != ncol(p_mat), ] # remove empty rows
   #p_mat <- p_mat[!rownames(p_mat) %in% c("N_N_N_N", "Absent"), colnames(p_mat) != "ND"] # not-detected does not mean not expressed (very uncertain sets)
   
   my_cols <- c("#6A00A8FF", "#FCA636FF", "#F0F921FF", "#F0F921FF")
   ggballoonplot(p_mat, fill="value") +
-                        theme_light() + labs(x="RNA expression dynamics", y=paste0("H3K4me3 TSS dynamics\n", "[Spermatid, Sperm, Pre-ZGA, ZGA]")) + rotate_x_text(45) +
-                        scale_fill_gradientn(colors = my_cols, values=c(0, 0.05, 0.5, 1), breaks=c(0, 2, 20, 50, 100, 200)) + guides(size=guide_legend(title="-log10(Fisher independence p value)"), fill=guide_legend(title="-log10(Fisher independence p value)")) + scale_size(range = c(0, 10), breaks =c(0, 2, 20, 50, 100, 200))
+                        theme_light() + labs(x="RNA expression", y=paste0("H3K4me3")) + rotate_x_text(45) +
+                        scale_fill_gradientn(colors = my_cols, values=c(0, 0.05, 0.5, 1), breaks=c(0, 2, 20, 50, 100, 200)) + guides(size=guide_legend(title="-log10(p value)"), fill=guide_legend(title="-log10(p value)")) + scale_size(range = c(0, 10), breaks =c(0, 2, 20, 50, 100, 200))
 }
 
 #plot_balloonplot(remove_ND_NNNN = FALSE)
 plot_balloonplot(remove_ND_NNNN = TRUE)
-
 ```
+
 ```{r fig.height=10, fig.width=15}
 library(ComplexUpset)
 rna_small <- rna_dyns[!names(rna_dyns) %in% c("ND")]
@@ -120,9 +121,11 @@ upset(
 ```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
 library(reshape2)
 library(ggpubr)
+remove_NA = TRUE
+onlypeaks = FALSE
 
 label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
-plot_peak <- function(name, groups){
+plot_peak <- function(name, groups, onlypeaks=FALSE, remove_NA=TRUE){
   if(groups=="rna"){
     dyn = rna_dyns
     cols = cols_rnadyns
@@ -131,27 +134,34 @@ plot_peak <- function(name, groups){
     cols = cols_chipdyns
   }
   stage_raw <- data.frame(chip_norm_mats[[paste(name)]])
+  if(onlypeaks){stage_raw <- stage_raw[chip_dfs[[paste(name)]]$peak, ]}
   stage_raw$dyn <- sapply(rownames(stage_raw), label_dyn, dyns = dyn)
   stage_raw$gene <- rownames(stage_raw)
+  if(remove_NA){stage_raw <- stage_raw[!is.na(stage_raw$dyn),]}
   melted <- melt(stage_raw)
   colnames(melted) <- c("dynamics", "Gene", "Genomic location", "Coverage")
   plot <- ggline(melted, x = "Genomic location", y = "Coverage",
-   add = "mean_se", conf.int = TRUE, color="dynamics") + scale_color_manual(values=cols) + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + labs(y=expression(log[2](coverage + 1)), x = "+/-1kb of TSS") + ggtitle(name)
+   add = "mean_se", conf.int = TRUE, color="dynamics") + scale_color_manual(values=cols) + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + labs(y=expression(atop(Mean~H3K4me3~ChIP-Seq~intensity,log[2](Coverage + 1))), x = "+/-1kb of TSS") + ggtitle(name) + guides(color = "none")
 }
 
-line_plots <- lapply(stages, plot_peak, groups=groups)
+line_plots <- lapply(stages, plot_peak, groups=groups, remove_NA=remove_NA, onlypeaks=onlypeaks)
 g <- arrangeGrob(line_plots[[1]], line_plots[[2]], line_plots[[3]], line_plots[[4]], ncol=4)
 ggsave(file=paste0(groups, "_line_plots.pdf"), g, width = 25, height = 4)
 ```
 
 #Differences in Chip/RNA groups
 ```{r fig.height=5, fig.width=10}
-plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE, legend=FALSE){
+remove_NA = TRUE
+onlypeaks = FALSE
+grouped = FALSE
+chip_clustering = c("Kept" = "Kept", "RecoveredLate"="Recovered", "RecoveredEarly"="Recovered", "RecoveredLong"="Recovered", "Lost@ZGA"="Lost", "Lost@Pre-ZGA"="Lost", "Lost@Sperm"="Lost", "GainedEarly"="Gained", "GainedLate"="Gained", "Absent"="Absent")
+
+plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE, legend=FALSE, remove_NA=TRUE, grouped=FALSE){
   if(groups == "rna"){
     cols = cols_rnadyns
     dyn = rna_dyns
   } else if(groups == "chip"){
-    if(type %in% c("peak.width", "promoter.enrich", "promoter.mean", "promoter.max")){onlypeaks=TRUE}
+    #if(type %in% c("peak.width", "promoter.enrich", "promoter.mean", "promoter.max")){onlypeaks=TRUE}
     cols = cols_chipdyns
     dyn = chip_dyns
   }
@@ -160,11 +170,45 @@ plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE, legend
   if(onlypeaks){plot_df <- plot_df[plot_df$peak, ]}
   plot_df$genes <- rownames(plot_df)
   plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = dyn))
-  #plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns), levels=c("Kept", "Recovered", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm", "GainedEarly", "GainedLate"))
-  plot_df$dyn <- factor(plot_df$dyn, levels = levels(reorder(plot_df$dyn, plot_df[,paste(type)], median, decreasing=TRUE)))
+  if(remove_NA){plot_df <- plot_df[!is.na(plot_df$dyn),]}
+  plot_df <- na.omit(plot_df)
+  
+  if(grouped){
+    plot_df$dyn_group <- factor(chip_clustering[as.vector(plot_df$dyn)])#levels = c("Kept", "Gained", "Lost", "Recovered","Absent")
+    cluster_order <- levels(reorder(plot_df$dyn_group, plot_df[,paste(type)], median, decreasing=TRUE))
+    pos <- seq(1, length(cluster_order)*2, 2)
+    get_sub_order <- function(cluster){
+      sub_order <-  levels(droplevels(reorder(plot_df[plot_df$dyn_group==cluster, "dyn"], 
+                                   plot_df[plot_df$dyn_group == cluster,paste(type)], 
+                                   median, decreasing=TRUE)))
+    }
+    for(dyn_group in levels(plot_df$dyn_group)){
+      sub_order = get_sub_order(dyn_group)
+      dyn_group_idx = which(cluster_order == dyn_group)
+      if(length(sub_order) > 0){
+        if(dyn_group_idx < length(pos)){
+          pos[(dyn_group_idx+1):length(pos)] <- pos[(dyn_group_idx+1):length(pos)] + length(sub_order) - 1
+        }
+        pos <- append(pos, seq(pos[dyn_group_idx], pos[dyn_group_idx]+length(sub_order)-1, 1), after=dyn_group_idx) 
+      }
+      else {
+        pos[(dyn_group_idx+1):length(pos)] <- pos[(dyn_group_idx+1):length(pos)] -2
+      }
+      pos <- pos[-dyn_group_idx]
+      cluster_order <- append(cluster_order, sub_order, after=dyn_group_idx)
+      cluster_order <- cluster_order[-dyn_group_idx]
+    }
+    plot_df$dyn <- factor(pos[as.numeric(factor(plot_df$dyn, levels = cluster_order))], levels = seq(1, max(pos)))
+    cols = setNames(cols[cluster_order], pos)
+  }
+  else {
+    plot_df$dyn <- factor(plot_df$dyn, levels = levels(reorder(plot_df$dyn, plot_df[,paste(type)], median, decreasing=TRUE)))
+  }
+  
   violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
-           add = "boxplot", add.params = list(fill = "white")) + scale_fill_manual(values=cols) + rotate_x_text(45) + guides(fill="none")
-  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values=cols) + guides(color = "none")
+           add = "boxplot", add.params = list(fill = "white")) + scale_fill_manual(values=cols) + rotate_x_text(45) + guides(fill="none") + ylab(paste(axis_titles[[type]])) + theme(axis.title.x=element_blank())
+  if(grouped){violin_plot <- violin_plot + scale_x_discrete(breaks = pos, labels=cluster_order, drop=FALSE)}
+  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values=cols) + guides(color = "none") + xlab(paste(axis_titles[[type]]))
   if(legend){
     violin_plot <- violin_plot + guides(fill = guide_legend(nrow = 2))
     ecdf_plot <- ecdf_plot + guides(color = guide_legend(nrow = 2))
@@ -173,10 +217,10 @@ plot_stage_dynamics <- function(timepoint, type, groups, onlypeaks=FALSE, legend
 }
 
 
-res_width = lapply(stages, plot_stage_dynamics, type="peak.width", groups)
-#res_enrich = lapply(stages, plot_stage_dynamics, type="promoter.enrich", groups)
-res_mean = lapply(stages, plot_stage_dynamics, type="promoter.mean", groups)
-#res_max = lapply(stages, plot_stage_dynamics, type="promoter.max", groups)
+res_width = lapply(stages, plot_stage_dynamics, type="peak.width", groups, remove_NA=remove_NA, onlypeaks=onlypeaks, grouped=grouped)
+#res_enrich = lapply(stages, plot_stage_dynamics, type="promoter.enrich", groups, remove_NA=remove_NA)
+res_mean = lapply(stages, plot_stage_dynamics, type="promoter.mean", groups, remove_NA=remove_NA, onlypeaks=onlypeaks, grouped=grouped)
+#res_max = lapply(stages, plot_stage_dynamics, type="promoter.max", groups, remove_NA=remove_NA)
 
 g <- arrangeGrob(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]], 
                  res_mean[[1]], res_mean[[2]], res_mean[[3]], res_mean[[4]],
@@ -187,14 +231,14 @@ ggsave(file=paste0(groups, "_dynamics.pdf"), g, width = 25, height = 6)
 ```
 
 ```{r fig.height=5, fig.width=10}
-plot(plot_stage_dynamics("ZGA", type="expression.6hpf", groups, legend=TRUE))
-plot(plot_stage_dynamics("ZGA", type="expression.7hpf", groups, legend=TRUE))
-plot(plot_stage_dynamics("ZGA", type="expression.8hpf", groups, legend=TRUE))
-plot(plot_stage_dynamics("ZGA", type="expression.9hpf", groups, legend=TRUE))
+plot(plot_stage_dynamics("ZGA", type="expression.6hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("ZGA", type="expression.7hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("ZGA", type="expression.8hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("ZGA", type="expression.9hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
 plot(plot_stage_dynamics("Pre-ZGA", type="promoter.dna.methyl", groups, legend=TRUE))
 plot(plot_stage_dynamics("Pre-ZGA", type="promoter.accessibility", groups, legend=TRUE))
 plot(plot_stage_dynamics("Sperm", type="promoter.dna.methyl", groups, legend=TRUE))
-plot(plot_stage_dynamics("Sperm", type="cg.density", groups, legend=TRUE))
+plot(plot_stage_dynamics("Spermatid", type="cg.density", groups, legend=TRUE))
 plot(plot_stage_dynamics("Spermatid", type="promoter.dna.methyl", groups, legend=TRUE))
 ```
 
@@ -322,9 +366,30 @@ ggplot(table_df, aes(Cluster, Gene.expression, fill = log_enrichment)) +
 
 ##Heatmap per H3K4me3/RNA dynamic
 ```{r message=FALSE, warning=FALSE}
+clustering = FALSE
+
+pure_labels <- c("Spermatid.promoter.dna.methyl" = "Spermatid", 
+                 "Sperm.promoter.dna.methyl"="Sperm", 
+                 "Pre.ZGA.promoter.dna.methyl"="Pre-ZGA", 
+                 "Pre.ZGA.promoter.accessibility"="Pre-ZGA", 
+                 "ZGA.expression.9hpf" = "9hpf", 
+                 "ZGA.expression.8hpf" = "8hpf", 
+                 "ZGA.expression.7hpf" = "7hpf",
+                 "ZGA.expression.6hpf" = "6hpf",
+                 "CG.density" ="",
+                 "Spermatid.peak.width" = "Spermatid",
+                 "Sperm.peak.width" = "Sperm",
+                 "Pre.ZGA.peak.width" = "Pre-ZGA",
+                 "ZGA.peak.width" = "ZGA",
+                 "Spermatid.promoter.mean" = "Spermatid",
+                 "Sperm.promoter.mean" = "Sperm",
+                 "Pre.ZGA.promoter.mean" = "Pre-ZGA",
+                 "ZGA.promoter.mean" = "ZGA")
+
 chip_dyn_map = melt(chip_dyns)
 rownames(chip_dyn_map) <- chip_dyn_map[,1]
 label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
+col_fun = colorRamp2(seq(-2, 2), rev(COL2("RdBu", n=5)))
 
 heatmap_data <- data.frame("Spermatid.peak.width" = chip_dfs[["Spermatid"]][,c("peak.width")],
                            "Spermatid.promoter.mean" = chip_dfs[["Spermatid"]][,c("promoter.mean")],
@@ -342,25 +407,32 @@ heatmap_data <- data.frame("Spermatid.peak.width" = chip_dfs[["Spermatid"]][,c("
                            "ZGA.expression.8hpf" = chip_dfs[["ZGA"]][,c("expression.8hpf")],
                            "ZGA.expression.7hpf" = chip_dfs[["ZGA"]][,c("expression.7hpf")],
                            "ZGA.expression.6hpf" = chip_dfs[["ZGA"]][,c("expression.6hpf")],
-                           "CG.density" = chip_dfs[["Sperm"]][,c("cg.density")],
+                           "CG.density" = chip_dfs[["Spermatid"]][,c("cg.density")],
                            "RNA.group" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns),
                            "Chip.group" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns))
 
 heatmap_data$RNA.group[is.na(heatmap_data$RNA.group)] <- "ND"
+if(clustered_groups){
+  heatmap_data$RNA.group <- factor(heatmap_data$RNA.group, levels = c("GS", "GZ", "ZS", "ND"))
+}
 
 ### RNA plot
-mean_data <- aggregate(. ~  RNA.group, data=heatmap_data[!colnames(heatmap_data) %in% c("Chip.group")], FUN=mean)
+mean_data <- aggregate(. ~  RNA.group, data=heatmap_data[!colnames(heatmap_data) %in% c("Chip.group", "ZGA.expression.9hpf", "ZGA.expression.8hpf", "ZGA.expression.7hpf", "ZGA.expression.6hpf" )], FUN=mean)
 rownames(mean_data) <- mean_data[,"RNA.group"]
 mean_data <- mean_data[,-1]
 scaled_data = as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
+rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
 hm_rna <- Heatmap(scaled_data, 
         name = "Enrichment z-score",
         col = col_fun,
-        column_title = "Datasets", row_title = "Genes",
-        show_row_dend = TRUE,
-        cluster_columns = TRUE,
+        #column_title = "Datasets", row_title = "Genes",
+        show_row_dend = clustering,
+        cluster_columns = clustering,
         show_row_names = TRUE,
+        cluster_rows = clustering,
+        row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation","Accessibility", "Peak width", "Promoter mean", "CG density"),
+        row_title_rot = 0,
         #column_order =  c("Monly", "Ponly", "MPonly", "MZonly", "PZonly", "MPZ", "Zonly", "ND"),
         #row_split = seq(1:nrow(scaled_data)),
         #cluster_row_slices = FALSE
@@ -368,18 +440,22 @@ hm_rna <- Heatmap(scaled_data,
 draw(hm_rna)
 
 ### Chip plot
-mean_data <- aggregate(. ~  Chip.group, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group")], FUN=mean)
+mean_data <- aggregate(. ~  Chip.group, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "ZGA.peak.width", "Pre.ZGA.peak.width", "Spermatid.peak.width", "Sperm.peak.width", "ZGA.promoter.mean", "Pre.ZGA.promoter.mean", "Spermatid.promoter.mean", "Sperm.promoter.mean")], FUN=mean)
 rownames(mean_data) <- mean_data[,"Chip.group"]
 mean_data <- mean_data[,-1]
 scaled_data = as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
+rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
 hm_chip <- Heatmap(scaled_data, 
         name = "Enrichment z-score",
         col = col_fun,
-        column_title = "Datasets", row_title = "Genes",
-        show_row_dend = TRUE,
-        cluster_columns = TRUE,
+        #column_title = "Datasets", row_title = "Genes",
+        show_row_dend = clustering,
+        cluster_columns = clustering,
         show_row_names = TRUE,
+        cluster_rows = clustering,
+        row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "ZGA expression", "ZGA expression", "ZGA expression", "ZGA expression", "CG density"),
+        row_title_rot = 0,
         #column_order =  c("H_L_L_L", "L_H_L_L",  "H_H_L_L", "H_L_H_L", "L_H_H_L", "H_H_H_L", "H_L_L_H", "H_H_L_H", "H_L_H_H", "L_H_H_H", "H_H_H_H","L_H_L_H",  "L_L_H_H", "L_L_H_L", "L_L_L_H", "L_L_L_L"),
         #row_split = seq(1:nrow(scaled_data)),
         #cluster_row_slices = FALSE
@@ -436,6 +512,5 @@ fviz_pca_ind(data.pca,
              ellipse.type = "norm",
              legend.title = "Dynamics"
              )
-
 ```
 
