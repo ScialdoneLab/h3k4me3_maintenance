@@ -81,11 +81,11 @@ if(remove_NNNN){groups <- groups[!groups %in% c("N_N_N_N", "Absent")]}
 
 #groups <- groups[!groups %in% c("Kept")]
 
-pdf(file="chip_legend.pdf", width=10, height=3)
+pdf(file="chip_legend.pdf", width=10, height=10)
 plot.new()
 #plot(NULL, ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
-legend("center", title="H3K4me3", bty = "n",
-groups, fill=cols_chipdyns[groups], ncol = 5)
+legend("center", title="H3K4me3", bty = "y",
+groups, fill=cols_chipdyns[groups], ncol = 1)
 dev.off()
 
 ```
@@ -93,7 +93,7 @@ dev.off()
 ##Venn diagram of H3K4me3 dynamics
 ```{r}
 library(eulerr)
-euler_cols <- setNames(rep("#FFFFFF", 16), chip_names_complete)
+euler_cols <- setNames(rep("#FFFFFF00", 16), chip_names_complete)
 for(i in 1:length(chip_clustering)){
   cluster <- chip_clustering[[i]]
   for(dynamic in cluster){
@@ -131,7 +131,9 @@ library(ggalluvial)
 library(dplyr)
 library(ggpubr)
 
-plot_alluvial <- function(remove_NNNN, remove_YYYY){
+equal_scale = TRUE
+
+plot_alluvial <- function(remove_NNNN, remove_YYYY, equal_scale){
   get_row <- function(chip_dyn){
     levels = unlist(strsplit(names(chip_dyn), split = "_"))
     return(c(levels, length(chip_dyn[[1]]), names(chip_dyn)))
@@ -151,22 +153,46 @@ plot_alluvial <- function(remove_NNNN, remove_YYYY){
   if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
   if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
   
+  plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_N_Y_N", "N_Y_N_Y"),]
+  #plot_df$Dynamic <- factor(plot_df$Dynamic, levels = c("Y_Y_Y_Y","Y_Y_Y_N","Y_Y_N_N", "Y_N_N_N", "N_Y_N_N", "N_N_N_Y", "Y_N_N_Y", "N_N_Y_Y",  "Y_Y_N_Y", "Y_N_Y_Y"))
+  
   for(stage in stages){
     plot_df[,stage] <- factor(plot_df[,stage], levels=c("Y", "N"))
   }
-  
-  ggplot(plot_df,
+  if(equal_scale){
+    plot_df$Freq <- 1
+    #for(stage in stages){
+    #  plot_df[plot_df[,stage] == "Y","Freq"] <- plot_df[plot_df[,stage] == "Y","Freq"]/
+    #    sum(plot_df[plot_df[,stage] == "Y","Freq"])
+    #  plot_df[plot_df[,stage] == "N","Freq"] <- plot_df[plot_df[,stage] == "N","Freq"]/
+    #    sum(plot_df[plot_df[,stage] == "N","Freq"])
+    #}
+  }else{
+    plot_df <- plot_df[!plot_df$Dynamic %in% c("N_Y_N_N", "N_Y_N_Y", "N_Y_Y_Y", "N_Y_Y_N", "Y_N_Y_N", "N_N_Y_N"),]
+  }
+  alluvial_plot <- ggplot(plot_df,
          aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
-    geom_alluvium(aes(fill = Dynamic), width = 1/12) + theme_pubr() +
-    geom_stratum(width = 1/12, fill = "grey", color = "black", alpha = .75) +
-    geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+    geom_alluvium(aes(fill = Dynamic), width = 1/12, lode.guidance="backfront") + theme_pubr() +
+    geom_stratum(width = 1/12, alpha = .75) +
+    geom_label(stat = "stratum", aes(label = after_stat(stratum)), fill="white") +
     scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
-    scale_fill_manual(values=euler_cols) + guides(fill="none")
+    scale_fill_manual(values=euler_cols) + 
+    guides(fill="none") 
+  if(equal_scale){
+    alluvial_plot <- alluvial_plot + geom_hline(yintercept = 1/2*sum(plot_df$Freq), col = "black", linetype="dotted") +
+    theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+  }
+  plot(alluvial_plot)
 }
 
-plot_alluvial(remove_NNNN = FALSE, remove_YYYY = FALSE)
-plot_alluvial(remove_NNNN = TRUE, remove_YYYY = FALSE)
-plot_alluvial(remove_NNNN = TRUE, remove_YYYY = TRUE)
+pdf(file="alluvial.pdf", width=8, height=5)
+plot_alluvial(remove_NNNN = FALSE, remove_YYYY = FALSE, equal_scale=equal_scale)
+dev.off()
+
+plot_alluvial(remove_NNNN = TRUE, remove_YYYY = FALSE, equal_scale=equal_scale)
+plot_alluvial(remove_NNNN = TRUE, remove_YYYY = TRUE, equal_scale=equal_scale)
 
 ```
 
