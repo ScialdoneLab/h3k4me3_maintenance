@@ -1,0 +1,390 @@
+---
+title: "RNA analysis"
+author: "Marco Stock"
+---
+
+## Settings
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message = FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+```{r}
+load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
+```
+```{r message=FALSE}
+rna_groups <- list(GS = c("Monly", "Ponly", "MPonly"), GZ = c("MZonly", "PZonly", "MPZ"), ZS = "Zonly", ND = "ND")
+rna_groups_timing <- list("Expressed@6hpf" = "zga_nascent.6hpf", "Expressed@7hpf"="zga_nascent.7hpf","Expressed@8hpf"="zga_nascent.8hpf","Expressed@9hpf"="zga_nascent.9hpf", NonZygotic = c("Monly", "Ponly", "MPonly", "ND"))
+```
+
+## Load Teperek TPM
+```{r message=FALSE, warning=FALSE, include=FALSE}
+detected_thr = 5
+
+teperek_se <- readRDS("data/raw/rna/sperm/GSE75164.rds")
+teperek <- as.data.frame(assays(teperek_se)$tpms)
+teperek$name = rowData(teperek_se)$name
+teperek <- teperek[!duplicated(teperek$name),]
+
+spermatid.detected <- teperek[teperek[,"GSM1944414"] > detected_thr & teperek[,"GSM1944415"] > detected_thr & teperek[,"GSM1944416"] > detected_thr, "name"]
+spermatid.detected <- unique(spermatid.detected)
+
+expression.spermatid <- rowMeans(cbind(teperek[,"GSM1944414"], teperek[,"GSM1944415"], teperek[,"GSM1944416"]))
+names(expression.spermatid) <- teperek[, "name"]
+expression.spermatid <- expression.spermatid[allgenes$gene_id]
+```
+
+## Load dataset: Egg + Nascent (Chen)
+```{r}
+chen_se <- readRDS("data/raw/rna/egg/GSE201835.rds")
+G_thr = 5
+Z_thr <- 5
+Z_thr_lenient = 0
+
+chen <- as.data.frame(assays(chen_se)$tpms)
+chen$name = rowData(chen_se)$name
+chen <- chen[!duplicated(chen$name),]
+ 
+egg.detected <- chen[chen[,"GSM6076970"] > G_thr & chen[,"GSM6076971"] > G_thr, "name"]
+egg.detected <- unique(egg.detected)
+```
+
+```{r}
+get_detected_genes <- function(rep1, rep2, rep3, rep4, stringent=FALSE){
+  if(stringent){thresh = Z_thr}else{thresh = Z_thr_lenient}
+  rep1_detected = (chen[,rep1] - chen[,"GSM6076950"]) > thresh
+  rep2_detected = (chen[,rep2] - chen[,"GSM6076951"]) > thresh
+  rep3_detected = (chen[,rep3] - chen[,"GSM6076974"]) > thresh
+  rep4_detected = (chen[,rep4] - chen[,"GSM6076975"]) > thresh
+  if(stringent){
+    detected = rep1_detected & rep2_detected & rep3_detected & rep4_detected
+  } else {
+    detected = rep1_detected | rep2_detected | rep3_detected | rep4_detected
+  }
+}
+get_zga_genes <- function(stringent=FALSE, total=TRUE){
+  zga_nascent.6hpf <- get_detected_genes(rep1="GSM6076952", rep2="GSM6076953", rep3="GSM6076976", rep4="GSM6076977", stringent=stringent)
+  zga_nascent.7hpf <- get_detected_genes(rep1="GSM6076954", rep2="GSM6076955", rep3="GSM6076978", rep4="GSM6076979", stringent=stringent)
+  zga_nascent.8hpf <- get_detected_genes(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM6076980", rep4="GSM6076981", stringent=stringent)
+  zga_nascent.9hpf <- get_detected_genes(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983", stringent=stringent)
+  zga_nascent.detected <- zga_nascent.6hpf | zga_nascent.7hpf | zga_nascent.8hpf | zga_nascent.9hpf
+  
+  if(total){return(unique(chen[zga_nascent.detected, "name"]))}
+  else{
+    zga_nascent.6hpf.detected <- unique(chen[zga_nascent.6hpf, "name"])
+    zga_nascent.7hpf.detected <- unique(chen[zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    zga_nascent.8hpf.detected <- unique(chen[zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.6hpf, "name"])
+    zga_nascent.9hpf.detected <- unique(chen[zga_nascent.9hpf & !zga_nascent.8hpf & !zga_nascent.7hpf & !zga_nascent.7hpf, "name"])
+    list("6hpf"=zga_nascent.6hpf.detected, "7hpf"=zga_nascent.7hpf.detected, 
+                   "8hpf"=zga_nascent.8hpf.detected, "9hpf"=zga_nascent.9hpf.detected)
+  }
+}
+```
+
+```{r}
+zga_nascent.detected_stringent <- get_zga_genes(stringent = TRUE, total=TRUE)
+zga_nascent.detected_lenient <- get_zga_genes(stringent = FALSE, total=TRUE)
+
+get_expression <- function(rep1, rep2, rep3, rep4){
+  mean_expression = (pmax(chen[,rep1] - chen[,"GSM6076950"], 0) + pmax(chen[,rep2] - chen[,"GSM6076951"], 0) +
+                    pmax(chen[,rep3] - chen[,"GSM6076974"], 0) + pmax(chen[,rep4] - chen[,"GSM6076975"], 0)) /4
+  names(mean_expression) <- chen$name
+  return(mean_expression[allgenes$gene_id])
+}
+```
+```{r}
+expression.6hpf = get_expression(rep1="GSM6076952", rep2="GSM6076953", rep3="GSM6076976", rep4="GSM6076977")
+expression.7hpf = get_expression(rep1="GSM6076954", rep2="GSM6076955", rep3="GSM6076978", rep4="GSM6076979")
+expression.8hpf = get_expression(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM6076980", rep4="GSM6076981")
+expression.9hpf = get_expression(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983")
+expression.data = list("Spermatid"=expression.spermatid, "6hpf"=expression.6hpf, "7hpf"=expression.7hpf, "8hpf"=expression.8hpf, "9hpf"=expression.9hpf)
+
+zga_nascent.stages <- get_zga_genes(stringent = TRUE, total=FALSE)
+zga_nascent.6hpf <- zga_nascent.stages[["6hpf"]]
+zga_nascent.7hpf <- zga_nascent.stages[["7hpf"]]
+zga_nascent.8hpf <- zga_nascent.stages[["8hpf"]]
+zga_nascent.9hpf <- zga_nascent.stages[["9hpf"]]
+```
+
+## Detected genes at each stage
+```{r}
+rna_genes <- intersect(unique(union(chen$name, teperek$name)), allgenes$gene_id)
+spermatid.detected <- spermatid.detected[spermatid.detected %in% rna_genes]
+egg.detected <- egg.detected[egg.detected %in% rna_genes]
+zga_nascent.detected_stringent <- zga_nascent.detected_stringent[zga_nascent.detected_stringent %in% rna_genes]
+zga_nascent.detected_lenient <- zga_nascent.detected_lenient[zga_nascent.detected_lenient %in% rna_genes]
+zga_nascent.6hpf <- zga_nascent.6hpf[zga_nascent.6hpf %in% rna_genes]
+zga_nascent.7hpf <- zga_nascent.7hpf[zga_nascent.7hpf %in% rna_genes]
+zga_nascent.8hpf <- zga_nascent.8hpf[zga_nascent.8hpf %in% rna_genes]
+zga_nascent.9hpf <- zga_nascent.9hpf[zga_nascent.9hpf %in% rna_genes]
+```
+
+## Definition of dynamic groups
+```{r}
+rna_names_complete <- c("Monly", "Ponly", "Zonly", "MPonly", "MZonly", "PZonly", "MPZ", "ND")
+Monly <- setdiff(setdiff(egg.detected, spermatid.detected), zga_nascent.detected_lenient)
+Zonly <- setdiff(setdiff(zga_nascent.detected_stringent, egg.detected), spermatid.detected)
+Ponly <-  setdiff(setdiff(spermatid.detected, zga_nascent.detected_lenient), egg.detected)
+MZonly <- setdiff(intersect(egg.detected, zga_nascent.detected_stringent), spermatid.detected)
+MPonly <- setdiff(intersect(egg.detected, spermatid.detected), zga_nascent.detected_lenient)
+PZonly <- setdiff(intersect(spermatid.detected, zga_nascent.detected_stringent), egg.detected)
+MPZ <- intersect(intersect(egg.detected, spermatid.detected), zga_nascent.detected_stringent)
+ND <- setdiff(setdiff(setdiff(allgenes$gene_id,egg.detected), spermatid.detected), zga_nascent.detected_lenient)
+
+
+rna_dyns <- lapply(rna_groups, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
+rna_dyns_timing <- lapply(rna_groups_timing, function(cluster){unlist(sapply(cluster, function(dyn_name){get(dyn_name)}), use.names = FALSE)})
+rna_dyns_complete <- list("Monly" = Monly, "Ponly" = Ponly, "Zonly" = Zonly, "MPonly" = MPonly, "MZonly" = MZonly, "PZonly" = PZonly, "MPZ"= MPZ, "ND"= ND)
+
+rna_dyns_sizes = unlist(lapply(rna_dyns, function(x) length(x)))
+rna_dyns_timing_sizes = unlist(lapply(rna_dyns_timing, function(x) length(x)))
+```
+
+## Save data
+```{r eval = FALSE}
+response <- readline("Do you want to save the dynamics? (yes/no): ")
+if (tolower(response) == "yes") {
+  if(clustered_rna_groups){
+    save(rna_dyns, cols_rna, expression.data, file="rna_data_clustered.RData")
+  } else {
+    save(rna_dyns, cols_rna, expression.data, file="rna_data.RData")
+  }
+} else {
+  print("Dynamics not saved")
+}
+```
+
+## Plot legend
+```{r}
+remove_ND <- FALSE
+
+groups <- names(rna_groups)
+if(remove_ND){groups <- groups[!groups %in% c("ND")]}
+
+pdf(file="output/rna/rna_dynamics_legend.pdf", width=10, height=10)
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", legend=groups, title="RNA dynamics", fill=cols_rna[groups], horiz=FALSE)
+dev.off()
+
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", legend=groups, title="RNA dynamics", fill=cols_rna[groups], horiz=FALSE)
+
+groups <- names(rna_groups_timing)
+if(remove_ND){groups <- groups[!groups %in% c("NonZygotic")]}
+
+pdf(file="output/rna/rna_dynamics_timing_legend.pdf", width=10, height=10)
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", legend=groups, title="RNA dynamics", fill=cols_rna_timing[groups], horiz=FALSE)
+dev.off()
+
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topright", legend=groups, title="RNA dynamics", fill=cols_rna_timing[groups], horiz=FALSE)
+```
+
+## Venn diagram of RNA dynamics
+```{r}
+euler_cols <- setNames(rep("#d3d3d3", 8), rna_names_complete)
+for(i in 1:length(rna_groups)){
+  cluster <- rna_groups[[i]]
+  for(dynamic in cluster){
+    euler_cols[dynamic]=cols_rna[names(rna_groups)[i]]
+  }
+}
+
+plot_euler <- function() {
+  plot(euler(c("Egg"=length(Monly), "Spermatid"=length(Ponly), "ZGA"=length(Zonly),
+           "Egg&Spermatid"=length(MPonly), "Egg&ZGA"=length(MZonly), "Spermatid&ZGA"=length(PZonly), "Egg&Spermatid&ZGA"=length(MPZ))),
+     quantities = TRUE,fills=unlist(euler_cols))
+}
+plot(venn(c("Egg"=length(Monly), "Spermatid"=length(Ponly), "ZGA"=length(Zonly),
+           "Egg&Spermatid"=length(MPonly), "Egg&ZGA"=length(MZonly), "Spermatid&ZGA"=length(PZonly), "Egg&Spermatid&ZGA"=length(MPZ))),
+     quantities = TRUE,fills=unlist(euler_cols))
+
+pdf(file="output/rna/rna_dynamics_venn.pdf", width=5, height=5)
+plot_euler()
+dev.off()
+
+plot_euler()
+```
+
+## Combine and transform TPM data 
+```{r}
+reps = "both" #1, 2, or "both"
+
+hpf5 <- c("GSM6076950", "GSM6076951", "GSM6076974", "GSM6076975")
+hpf6 <- c("GSM6076952", "GSM6076953", "GSM6076976", "GSM6076977")
+hpf7 <- c("GSM6076954", "GSM6076955", "GSM6076978", "GSM6076979")
+hpf8 <- c("GSM6076956", "GSM6076957", "GSM6076980", "GSM6076981")
+hpf9 <- c("GSM6076958", "GSM6076959", "GSM6076982", "GSM6076983")
+hpfs <- list("5hpf"=hpf5, "6hpf"=hpf6, "7hpf"=hpf7, "8hpf"=hpf8, "9hpf"=hpf9)
+
+if(reps==1){
+  hpfs <- lapply(hpfs, function(hpf){hpf[1:2]})
+} else if(reps==2){
+  hpfs <- lapply(hpfs, function(hpf){hpf[3:4]})
+}
+
+hm_data.zga <- data.frame(T6hpf = rowMeans(chen[,hpfs[["6hpf"]]]),
+                   T7hpf = rowMeans(chen[,hpfs[["7hpf"]]]),
+                   T8hpf = rowMeans(chen[,hpfs[["8hpf"]]]),
+                   T9hpf = rowMeans(chen[,hpfs[["9hpf"]]]))
+rownames(hm_data.zga) <- chen[, "name"]
+zga_nascent.5hpf <- rowMeans(chen[,hpfs[["5hpf"]]])
+hm_data.zga <- apply(hm_data.zga, 2, function(x) x - zga_nascent.5hpf)
+hm_data.zga[hm_data.zga<0] <- 0
+
+hm_data.spermatid <- data.frame(Spermatid = rowMeans(cbind(teperek[,"GSM1944414"], teperek[,"GSM1944415"], teperek[,"GSM1944416"])))
+rownames(hm_data.spermatid) <- teperek[, "name"]
+hm_data.egg <- data.frame(Egg = rowMeans(cbind(chen[,"GSM6076970"], chen[,"GSM6076971"])))
+rownames(hm_data.egg) <- chen[, "name"]
+
+tpms_ct <- merge(hm_data.spermatid, cbind(hm_data.egg, hm_data.zga), by = "row.names", all = TRUE)
+rownames(tpms_ct) <- tpms_ct$Row.names
+tpms_ct <- tpms_ct[rownames(tpms_ct) %in% c(unlist(rna_dyns), unlist(rna_dyns_timing)),!(names(tpms_ct) %in% "Row.names")]
+
+for (rna_dyn in names(rna_dyns)){
+  tpms_ct[unlist(rna_dyns[rna_dyn]), "Category"] <- rna_dyn
+}
+tpms_ct$Category <- factor(tpms_ct$Category, levels = names(rna_dyns))
+
+for (rna_dyn in names(rna_dyns_timing)){
+  tpms_ct[unlist(rna_dyns_timing[rna_dyn]), "Timing"] <- rna_dyn
+}
+tpms_ct$Timing <- factor(tpms_ct$Timing, levels = names(rna_dyns_timing))
+
+tpms_ct <- replace(tpms_ct, is.na(tpms_ct), 0)
+```
+
+## RNA groups heatmap
+```{r, fig.width=6, fig.height=8}
+cols_biscale = colorRamp2(seq(0,7,7/5), c("#ffffd4", "#fee391", "#fec44f", "#fe9929", "#d95f0e", "#993404"))
+remove_ND <- TRUE
+
+tpms_ct_plot <- tpms_ct
+if(remove_ND){
+  tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND"),]
+  tpms_ct_plot$Category <- factor(tpms_ct_plot$Category)}
+
+hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
+
+col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
+h1 <- Heatmap(hm_values.log, row_split = tpms_ct_plot$Category, name="log2(TPM+1)",
+               cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
+               col = cols_biscale, row_title_gp = gpar(cex=0.5), left_annotation = rowAnnotation(Category = tpms_ct_plot$Category, col = list(Category = unlist(cols_rna))))
+
+draw(h1)
+
+pdf("output/rna/rna_dynamics_heatmap.pdf", width=6, height=8)
+draw(h1)
+dev.off()
+```
+```{r, fig.width=6, fig.height=8}
+cols_biscale = colorRamp2(seq(0,7,7/5), c("#ffffd4", "#fee391", "#fec44f", "#fe9929", "#d95f0e", "#993404"))
+remove_ND <- TRUE
+
+tpms_ct_plot <- tpms_ct
+if(remove_ND){
+  tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Timing %in% c("NonZygotic"),]
+  tpms_ct_plot$Timing <- factor(tpms_ct_plot$Timing)}
+
+hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
+
+col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
+h1 <- Heatmap(hm_values.log, row_split = tpms_ct_plot$Timing, name="log2(TPM+1)",
+               cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
+               col = cols_biscale, row_title_gp = gpar(cex=0.5), left_annotation = rowAnnotation(Timing = tpms_ct_plot$Timing, col = list(Timing = unlist(cols_rna_timing))))
+
+draw(h1)
+
+pdf("output/rna/rna_timing_dynamics_heatmap.pdf", width=6, height=8)
+draw(h1)
+dev.off()
+```
+
+## RNA groups boxplots
+```{r}
+remove_ND <- TRUE
+remove_gametes <- TRUE
+
+tpms_ct_plot <- tpms_ct
+if(remove_ND){
+  tpms_ct_plot <- tpms_ct_plot[!tpms_ct$Category %in% c("ND", "NonZygotic"),]
+  tpms_ct_plot$Category <- factor(tpms_ct_plot$Category)}
+
+hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
+plot_data <- data.frame(cbind(as.vector(tpms_ct_plot$Category), hm_values.log))
+colnames(plot_data)[1] <- "Category"
+plot_data <- pivot_longer(plot_data, cols=c("Spermatid", "Egg", "T6hpf", "T7hpf", "T8hpf", "T9hpf"), names_to='Time', values_to='Expression')
+plot_data$Expression <- as.numeric(plot_data$Expression)
+plot_data$Time <- factor(plot_data$Time)
+if(remove_gametes){plot_data <- plot_data[!plot_data$Time %in% c("Egg", "Spermatid"),]
+}else{plot_data$Category <- factor(plot_data$Category, levels=c("GS", "GZ", "ZS", "ND"))}
+
+ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", add.params = list(fill = "white")) + labs(y = "log2(TPM+1)") +  theme_pubr() + scale_fill_manual(values=cols_rna) + facet_wrap(~Category, scale="fixed", ncol = 4) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4") + theme(legend.title=element_blank())
+```
+
+## Balloon plot
+```{r}
+plot_balloonplot(x_dyns=rna_dyns_timing, y_dyns=rna_dyns, limit=200, remove_dyns=c("ND", "NonZygotic"), x_caption="ZGA Timing", y_caption="RNA dynamics")
+ggsave('output/rna/rna_timing_balloon_plot.pdf', width=5, height=3)
+```
+
+## Violin / ECDF plot
+```{r}
+data <- list(ZGA = log2(as.data.frame(expression.data, row.names=allgenes$gene_id) + 1))
+expression_plot <- plot_stage_dynamics(data, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="ZGA", type="X9hpf")
+grid.arrange(expression_plot)
+ggsave('output/rna/rna_timing_9hpf_violin_ecdf.pdf', expression_plot, width=10, height=5)
+```
+
+## GO analysis on each gene group
+```{r, fig.width=8, fig.height=12}
+for (i in 1:length(rna_dyns)){
+  rna_GO <- go_enrichment(rna_dyns[[i]])
+  if(sum(rna_GO@result$p.adjust < rna_GO@pvalueCutoff)){
+    pdf(file=paste0("output/rna/GO_", names(rna_dyns)[i], ".pdf"), width=8, height=12)
+    plot_go(rna_GO, names(rna_dyns)[i])
+    dev.off()
+    plot_go(rna_GO, names(rna_dyns)[i])
+  }
+}
+```
+
+```{r message=FALSE, warning=FALSE}
+go_dyns <- rna_dyns[!names(rna_dyns) %in% c("ND")]
+for (i in 1:length(go_dyns)){
+  enrichGO <- go_enrichment(go_dyns[[i]])
+  hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
+  if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(rna_dyns[i]))}
+}
+```
+```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
+p_adj = 0.01
+go_dyns <- rna_dyns[!names(rna_dyns) %in% c("ND", "NonZygotic")]
+go_list <- lapply(go_dyns, go_enrichment)
+go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
+go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
+pdf(file="output/rna/GO_summary_rna_dynamics.pdf", width=10, height=6)
+simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
+dev.off()
+simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
+```
+```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
+p_adj = 0.01
+go_dyns <- rna_dyns_timing#[!names(rna_dyns_timing) %in% c("ND", "NonZygotic")]
+go_list <- lapply(go_dyns, go_enrichment)
+go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
+go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
+pdf(file="output/rna/GO_summary_rna_timing_dynamics.pdf", width=10, height=6)
+simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
+dev.off()
+simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
+```
+
+
+
+
+

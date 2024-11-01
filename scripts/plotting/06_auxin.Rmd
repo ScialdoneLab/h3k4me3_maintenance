@@ -1,0 +1,14 @@
+## Settings
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message=FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+
+```{r}
+print(getwd())
+print(axis_titles)
+```
