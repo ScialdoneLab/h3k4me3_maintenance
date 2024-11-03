@@ -8,107 +8,38 @@ source("scripts/utils.R")
 source("scripts/settings.R")
 ```
 ```{r}
-load("data/processed/rna_data.RData")
-load("data/processed/chip_data.RData")
+load("data/processed/rna_dynamics.RData")
+load("data/processed/chip_dynamics.RData")
 load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```
 
-## Load categories
+## Bind expression and chip data
 ```{r message=FALSE, warning=FALSE}
-clustered_groups = TRUE
-groups = "rna"
-
-chip_dfs[["Spermatid"]]$cg.density <- unname(cg_density[allgenes$gene_id])
-chip_dfs[["Spermatid"]]$promoter.dna.methyl <- DNAme_spermatid
 chip_dfs[["Spermatid"]]$expression <- log(expression.data[["Spermatid"]] + 1)
-chip_dfs[["Sperm"]]$promoter.dna.methyl <- DNAme_sperm
-chip_dfs[["Pre-ZGA"]]$promoter.dna.methyl <- DNAme_prezga
-chip_dfs[["Pre-ZGA"]]$promoter.accessibility <- DamID_prezga
 chip_dfs[["ZGA"]]$expression.6hpf <- log(expression.data[["6hpf"]] + 1)
 chip_dfs[["ZGA"]]$expression.7hpf <- log(expression.data[["7hpf"]] + 1)
 chip_dfs[["ZGA"]]$expression.8hpf <- log(expression.data[["8hpf"]] + 1)
 chip_dfs[["ZGA"]]$expression.9hpf <- log(expression.data[["9hpf"]] + 1)
-
 chip_dfs[["Spermatid"]]$expression[is.na(chip_dfs[["Spermatid"]]$expression)] <- 0
 chip_dfs[["ZGA"]]$expression.6hpf[is.na(chip_dfs[["ZGA"]]$expression.6hpf)] <- 0
 chip_dfs[["ZGA"]]$expression.7hpf[is.na(chip_dfs[["ZGA"]]$expression.7hpf)] <- 0
 chip_dfs[["ZGA"]]$expression.8hpf[is.na(chip_dfs[["ZGA"]]$expression.8hpf)] <- 0
 chip_dfs[["ZGA"]]$expression.9hpf[is.na(chip_dfs[["ZGA"]]$expression.9hpf)] <- 0
-
 ```
 
-```{r fig.height=5, fig.width=1}
-
-plot_ratio <- function(rna_group){
-  intersection_list <- list()
-  dyns <- list()
-  dyns[[paste(rna_group)]] = rna_dyns[[rna_group]]
-  chip_dyns[["Other"]] <- unlist(chip_dyns[c("Recovered", "Lost", "Gained")])
-  chip_dyns <- chip_dyns[c("Absent", "Kept", "Other")]
-  cols = list()
-  cols[[paste("Absent &", rna_group)]]="grey"
-  cols[[paste("Kept &", rna_group)]]=unname(cols_chipdyns["Kept"])
-  cols[[paste("Other &", rna_group)]]="lightblue"
-  
-  for (rna_dyn in names(dyns)) {
-    for (chip_dyn in names(chip_dyns)) {
-      intersection_name <- paste(chip_dyn, rna_dyn, sep = " & ")
-      intersection_list[[intersection_name]] <- intersect(chip_dyns[[chip_dyn]], dyns[[rna_dyn]])
-    }
-  }
-  
-  dyns_sizes <- unlist(lapply(intersection_list, function(x) length(x)))
-  data <- data.frame("sizes"=dyns_sizes, "dyn"=names(dyns_sizes), "id"=1)
-  ggplot(data, aes(fill=dyn, y=sizes, x=id)) + 
-      geom_bar(position="fill", stat="identity", fill=cols) + theme_pubr() + ylab("Ratio") + theme(axis.title.x=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks.x=element_blank()) + ggtitle(rna_group)
-}
-plot_ratio("GZ")
-plot_ratio("ZS")
-plot_ratio("GS")
-plot_ratio("ND")
-```
-```{r fig.height=5, fig.width=4}
-cols_mod <- c(cols_chipdyns[!names(cols_chipdyns)%in%c("Recovered", "Lost", "Gained")], "Other"="darkgrey")
-dyns_mod = chip_dyns[c("Kept", "Absent")]
-dyns_mod[["Other"]] = unname(unlist(chip_dyns[c("Recovered", "Lost", "Gained")]))
-
-genesAbsolute_mod = genesAbsolute[c("Kept", "Absent"),]
-genesAbsolute_mod["Other", ] <- colSums(genesAbsolute[c("Recovered", "Lost", "Gained"),])
-
-ggdf1 <- melt(cbind(genesAbsolute_mod, rownames(genesAbsolute_mod)))
-names(ggdf1)<- c("H3K4me3", "RNA", "count")
-ggdf1$H3K4me3 <- factor(ggdf1$H3K4me3, levels=c("Kept", "Other", "Absent"))
-ggplot(ggdf1, aes(fill=H3K4me3, y=count, x=RNA)) + geom_bar(position="fill", stat="identity") + theme_bw() + ylab("%") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_blank(), legend.title=element_blank()) + scale_fill_manual(values = cols_mod) + theme_pubr() 
-
-```
-
-## Balloon plot
+## Balloon plots
 ```{r message=FALSE, warning=FALSE, fig.height=3, fig.width=5}
-plot_balloonplot()
+plot_balloonplot(rna_dyns[names(rna_dyns) != "ND"], chip_dyns[names(chip_dyns) != "Absent"], limit=50, x_caption="RNA expression", y_caption="H3K4me3")
+ggsave('output/rna_chip/rna_chip_balloon_plot.pdf', width=5, height=3)
 ```
-
-```{r, fig.height=3, fig.width=3}
-genesAbsolute <- lapply(chip_ordered, function(x){as.data.frame(lapply(rna_ordered, function(y){length(intersect(x, y))}))})
-  genesAbsolute <- do.call(rbind, genesAbsolute)
-
-plot(euler(c("Kept"=length(chip_dyns$Kept), "GZ"=length(rna_dyns$GZ), "Kept&GZ"=length(intersect(chip_dyns$Kept, rna_dyns$GZ)))),
-     quantities = TRUE,fills=c(cols_chipdyns["Kept"], cols_rnadyns["GZ"], "#fa193b"))
-plot(venn(c("Kept"=length(chip_dyns$Kept), "GZ"=length(rna_dyns$GZ), "Kept&GZ"=length(intersect(chip_dyns$Kept, rna_dyns$GZ)))),
-     quantities = TRUE,fills=c(cols_chipdyns["Kept"], cols_rnadyns["GZ"], "#fa193b"))
-
-plot(euler(c("Kept"=sum(genesAbsolute["Kept",])-sum(genesAbsolute["Kept","GZ"]), "GZ"=sum(genesAbsolute[,"GZ"])-sum(genesAbsolute["Kept","GZ"]) , "Kept&GZ"=sum(genesAbsolute["Kept","GZ"]))),
-     quantities = TRUE,fills=c(cols_chipdyns["Kept"], cols_rnadyns["GZ"], "#fa193b"))
-plot(venn(c("Kept"=sum(genesAbsolute["Kept",])-sum(genesAbsolute["Kept","GZ"]), "GZ"=sum(genesAbsolute[,"GZ"])-sum(genesAbsolute["Kept","GZ"]) , "Kept&GZ"=sum(genesAbsolute["Kept","GZ"]))),
-     quantities = TRUE,fills=c(cols_chipdyns["Kept"], cols_rnadyns["GZ"], "#fa193b"))
+```{r message=FALSE, warning=FALSE, fig.height=3, fig.width=5}
+plot_balloonplot(rna_dyns_timing, chip_dyns, limit=100, x_caption="RNA expression", y_caption="H3K4me3", remove_dyns=c("NonZygotic", "Absent"))
+ggsave('output/rna_chip/rna_chip_timing_balloon_plot.pdf', width=5, height=3)
 ```
-
 
 ```{r fig.height=10, fig.width=15}
-
 rna_small <- rna_dyns[!names(rna_dyns) %in% c("ND")]
-chip_small <- chip_dyns[!names(chip_dyns) %in% c("N_N_N_N", "Absent")]
+chip_small <- chip_dyns[!names(chip_dyns) %in% c("Absent")]
 genes_of_interest <- unique(c(unlist(rna_small), unlist(chip_small)))
 cols = lapply(c(rna_small, chip_small), function(dyn) genes_of_interest %in% dyn)
 df <- data.frame(cols)
@@ -129,365 +60,90 @@ upset(
 )
 ```
 
-## Peak shape comparison
+## Peak line plots
 ```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
-remove_NA = TRUE
-onlypeaks = FALSE
-
-line_plots <- lapply(stages, plot_peak, groups=groups, remove_NA=remove_NA, onlypeaks=onlypeaks)
-g <- arrangeGrob(line_plots[[1]], line_plots[[2]], line_plots[[3]], line_plots[[4]], ncol=4)
-ggsave(file=paste0(groups, "_line_plots.pdf"), g, width = 25, height = 4)
+for(stage in stages){
+  plot_peak(stage=stage, dyns=rna_dyns, cols=cols_rna, remove_NA=TRUE, onlypeaks=FALSE)
+  ggsave(file=paste0("output/rna_chip/", stage, "_rna_peak_plot.pdf"), width = 5, height = 4)
+}
+```
+```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+for(stage in stages){
+  plot_peak(stage=stage, dyns=rna_dyns_timing, cols=cols_rna_timing, remove_NA=TRUE, onlypeaks=FALSE)
+  ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_peak_plot.pdf"), width = 5, height = 4)
+}
 ```
 
-## Differences in Chip/RNA groups
+## Euler / Venns of overlaps
+```{r, fig.height=3, fig.width=3}
+genesAbsolute <- lapply(chip_dyns, function(x){as.data.frame(lapply(rna_dyns, function(y){length(intersect(x, y))}))})
+genesAbsolute <- do.call(rbind, genesAbsolute)
+
+# all genes
+plot(venn(c("Kept"=length(chip_dyns$Kept), "GZ"=length(rna_dyns$GZ), "Kept&GZ"=length(intersect(chip_dyns$Kept, rna_dyns$GZ)))),
+     quantities = TRUE,fills=c(cols_chip["Kept"], cols_rna["GZ"], "#fa193b"))
+plot(euler(c("Kept"=length(chip_dyns$Kept), "GZ"=length(rna_dyns$GZ), "Kept&GZ"=length(intersect(chip_dyns$Kept, rna_dyns$GZ)))),
+     quantities = TRUE,fills=c(cols_chip["Kept"], cols_rna["GZ"], "#fa193b"))
+
+# only genes where both chip & rna dynamics are known
+euler_kept_gz <- function() {plot(euler(c("Kept"=sum(genesAbsolute["Kept",])-sum(genesAbsolute["Kept","GZ"]), "GZ"=sum(genesAbsolute[,"GZ"])-sum(genesAbsolute["Kept","GZ"]) , "Kept&GZ"=sum(genesAbsolute["Kept","GZ"]))),
+     quantities = TRUE,fills=c(cols_chip["Kept"], cols_rna["GZ"], "#fa193b"))}
+plot(venn(c("Kept"=sum(genesAbsolute["Kept",])-sum(genesAbsolute["Kept","GZ"]), "GZ"=sum(genesAbsolute[,"GZ"])-sum(genesAbsolute["Kept","GZ"]) , "Kept&GZ"=sum(genesAbsolute["Kept","GZ"]))),
+     quantities = TRUE,fills=c(cols_chip["Kept"], cols_rna["GZ"], "#fa193b"))
+euler_kept_gz()
+pdf('output/rna_chip/kept_gz_overlap_euler.pdf', width=4, height=3)
+euler_kept_gz()
+dev.off()
+```
+
+## Stacked bar of H3K4me3 ratios
+```{r fig.height=5, fig.width=4}
+cols_mod <- c(cols_chip[!names(cols_chip)%in%c("Recovered", "Lost", "Gained")], "Other"="darkgrey")
+dyns_mod = chip_dyns[c("Kept", "Absent")]
+dyns_mod[["Other"]] = unname(unlist(chip_dyns[c("Recovered", "Lost", "Gained")]))
+
+genesAbsolute_mod = genesAbsolute[c("Kept", "Absent"),]
+genesAbsolute_mod["Other", ] <- colSums(genesAbsolute[c("Recovered", "Lost", "Gained"),])
+
+ggdf1 <- melt(cbind(genesAbsolute_mod, rownames(genesAbsolute_mod)))
+names(ggdf1)<- c("H3K4me3", "RNA", "count")
+ggdf1$H3K4me3 <- factor(ggdf1$H3K4me3, levels=c("Kept", "Other", "Absent"))
+ggplot(ggdf1, aes(fill=H3K4me3, y=count, x=RNA)) + geom_bar(position="fill", stat="identity") + theme_bw() + ylab("%") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_blank(), legend.title=element_blank()) + scale_fill_manual(values = cols_mod) + theme_pubr() 
+ggsave('output/rna_chip/ratio_h3k4me3_rna_dynamics_stacked.pdf', width=5, height=4)
+```
+
+## Violin plots of H3K4me3 for RNA groups
 ```{r fig.height=5, fig.width=10}
-remove_NA = TRUE
-onlypeaks = FALSE
-grouped = FALSE
-chip_clustering = c("Kept" = "Kept", "RecoveredLate"="Recovered", "RecoveredEarly"="Recovered", "RecoveredLong"="Recovered", "Lost@ZGA"="Lost", "Lost@Pre-ZGA"="Lost", "Lost@Sperm"="Lost", "GainedEarly"="Gained", "GainedLate"="Gained", "Absent"="Absent")
-
-res_width = lapply(stages, plot_stage_dynamics, type="peak.width", groups, remove_NA=remove_NA, onlypeaks=onlypeaks, grouped=grouped)
-#res_enrich = lapply(stages, plot_stage_dynamics, type="promoter.enrich", groups, remove_NA=remove_NA)
-res_mean = lapply(stages, plot_stage_dynamics, type="promoter.mean", groups, remove_NA=remove_NA, onlypeaks=onlypeaks, grouped=grouped)
-#res_max = lapply(stages, plot_stage_dynamics, type="promoter.max", groups, remove_NA=remove_NA)
-
-g <- arrangeGrob(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]], 
-                 res_mean[[1]], res_mean[[2]], res_mean[[3]], res_mean[[4]],
-                  #res_enrich[[1]], res_enrich[[2]], res_enrich[[3]], res_enrich[[4]],
-                  #res_max[[1]], res_max[[2]], res_max[[3]], res_max[[4]],
-                  ncol=4)
-ggsave(file=paste0(groups, "_dynamics.pdf"), g, width = 25, height = 6)
+for(stage in stages){
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="promoter.mean", only_violin = TRUE)
+  grid.arrange(g)
+  ggsave(file=paste0("output/rna_chip/", stage, "_rna_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
+}
 ```
-
 ```{r fig.height=5, fig.width=10}
-plot(plot_stage_dynamics("Spermatid", type="promoter.mean", groups, remove_NA=TRUE, onlypeaks=TRUE, grouped=FALSE, legend=FALSE, levels=c("Kept", "Lost@Pre-ZGA", "Lost@ZGA", "Lost@Sperm")))
-plot(plot_stage_dynamics("ZGA", type="promoter.mean", groups, remove_NA=TRUE, onlypeaks=TRUE, grouped=FALSE, legend=FALSE, levels=c("Kept", "GainedEarly", "GainedLate")))
-plot(plot_stage_dynamics("ZGA", type="promoter.mean", groups, remove_NA=TRUE, onlypeaks=TRUE, grouped=FALSE, legend=FALSE))
-
-plot(plot_stage_dynamics("ZGA", type="expression.6hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("ZGA", type="expression.7hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("ZGA", type="expression.8hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("ZGA", type="expression.9hpf", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-
-plot(plot_stage_dynamics("Pre-ZGA", type="promoter.accessibility", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("Pre-ZGA", type="promoter.dna.methyl", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("Sperm", type="promoter.dna.methyl", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("Spermatid", type="promoter.dna.methyl", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-plot(plot_stage_dynamics("Spermatid", type="cg.density", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-
-plot(plot_stage_dynamics("Spermatid", type="promoter.mean", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
-```
-
-
-```{r, fig.width=8, fig.height=12}
-spermatid_df <- chip_dfs[["Spermatid"]][rna_dyns[["ZO"]],]
-high_promoter_zygotic <- spermatid_df[spermatid_df$promoter.mean >= median(spermatid_df$promoter.mean),]
-low_promoter_zygotic <- spermatid_df[spermatid_df$promoter.mean < median(spermatid_df$promoter.mean),]
-zygotic <- list(ZL = rownames(high_promoter_zygotic), ZH = rownames(low_promoter_zygotic))
-
-#zygotic <- list(Kept6hpf=intersect(rna_dyns[["Expressed@6hpf"]], chip_dyns[["Kept"]]))
-zygotic = list()
-for(i in 1:length(rna_dyns)){
-  for(j in 1:length(chip_dyns)){
-    zygotic[[paste(names(rna_dyns)[i], names(chip_dyns)[j], sep="&")]] <- intersect(rna_dyns[[i]], chip_dyns[[j]])
-  }
-}
-zygotic <- zygotic[unlist(lapply(zygotic, length))>0]
-#zygotic = zygotic[c("GS&Lost", "GZ&Kept", "ZS&Gained")]
-
-###GO analysis on each gene group
-go_enrichment <- function(data) {
-  entrez <- Xl_ENTREZ[Xl_ENTREZ$V2 %in% data, ] 
-  colnames(entrez) <- c("Xenbase ID", "Gene symbol", "Entrez ID", "Xl ID unknown")
-  GO <- enrichGO(entrez$`Entrez ID`, OrgDb = org.Xl.eg.db, ont = "BP", readable = TRUE)
-  return(GO)
-}
-plot_go <- function(enrichGO, name){
-  dp <- dotplot(enrichGO)
-  cn <- cnetplot(enrichGO)
-  grid.arrange(dp, cn, top=name, nrow=2)
-}
-
-for (i in 1:length(zygotic)){
-  if(length(zygotic[[i]])>0){
-    rna_GO <- go_enrichment(zygotic[[i]])
-  if(sum(rna_GO@result$p.adjust < rna_GO@pvalueCutoff)){
-    plot_go(rna_GO, names(zygotic)[i])
-    }
-  }
+for(stage in stages){
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="peak.width")
+  grid.arrange(g)
+  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
 }
 ```
-
-```{r message=FALSE, warning=FALSE}
-for (i in 1:length(zygotic)){
-  enrichGO <- go_enrichment(zygotic[[i]])
-  hits <- enrichGO@result$ID[enrichGO@result$p.adjust<0.05]
-  if(length(hits)>1){simplifyGO(GO_similarity(hits, db = 'org.Xl.eg.db'), column_title = names(zygotic[i]))
-    } else {print("no enriched GO term")}
-}
-```
-
-```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
-p_adj = 0.01
-go_list <- lapply(zygotic, go_enrichment)
-go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
-go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
-simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
-```
-##Unsupervised clustering heatmap
-```{r fig.height=9, fig.width=3, message=FALSE, warning=FALSE}
-genes = allgenes$gene_id
-
-hm_data <- chip_dfs[["Pre-ZGA"]][,c("promoter.mean", "peak.width", "promoter.dna.methyl", "promoter.accessibility")]
-#heatmap_data <- heatmap_data[sample(1:nrow(heatmap_data), 1000, replace=FALSE),]
-scaled_data = as.matrix(scale(hm_data))
-
-set.seed(12)
-kclus <- kmeans(scaled_data, 8)
-#cluster_order = c(4,5,2,6,8,7,3,1)
-split <- factor(kclus$cluster)#, levels=cluster_order)
-
-col_fun = colorRamp2(seq(-2, 2), rev(COL2("RdBu", n=5)))
-hm1 <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        column_title = "Datasets", row_title = "Genes",
-        show_row_dend = FALSE,
-        cluster_columns = FALSE,
-        show_row_names = FALSE,
-        #column_order = c("promoter.enrich", "peak.width", "promoter.dna.methyl", "promoter.accessibility"),
-        row_split = split,
-        cluster_row_slices = FALSE
-)
-
-draw(hm1)
-```
-
-## RNA dynamic enrichment
 ```{r fig.height=5, fig.width=10}
-
-rna_dyn_map = melt(rna_dyns)
-rownames(rna_dyn_map) <- rna_dyn_map[,1]
-
-data_df <- data.frame(rna_dyn_map[names(kclus$cluster), 2], kclus$cluster)
-colnames(data_df)<- c("Gene expression", "Cluster")
-table_df <- data.frame(table(data_df)[,rev(cluster_order)])
-
-log_enrich <- function(x) {
-  category_freq <- sum(table_df[table_df$Gene.expression==x["Gene.expression"],"Freq"])
-  cluster_ratio <- sum(table_df[table_df$Cluster==x["Cluster"],"Freq"]) / sum(table_df$Freq)
-  expected_freq <- category_freq * cluster_ratio
-  enrich <-  as.numeric(x["Freq"]) / expected_freq
-  if(enrich == 0){log_enrich = NA}
-  else{log_enrich <- log(enrich)}
-  return(log_enrich)
+for(stage in stages){
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="promoter.mean")
+  grid.arrange(g)
+  ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_violin_ecdf.pdf"), g, width = 10, height = 5)
 }
-table_df$log_enrichment <- apply(table_df, 1, log_enrich) 
-table_wide <- as.data.frame(pivot_wider(table_df[,c(1,2,4)], names_from=Cluster,values_from = log_enrichment))
-rownames(table_wide) <- unlist(table_wide[1])
-ggplot(table_df, aes(Cluster, Gene.expression)) + geom_tile(aes(fill = log_enrichment)) +
-  geom_text(aes(label = round(log_enrichment,2))) + theme_pubr() +
-  scale_fill_gradient2(low="blue", mid="white", high="red", limit=c(-3.5, 3.5))
-
-ggplot(table_df, aes(Cluster, Gene.expression, fill = log_enrichment)) +
-  geom_point(shape = 21, stroke = 0, size=10) +
-  scale_fill_gradient2(low="blue", mid="white", high="red", limit=c(-3.5, 3.5)) + guides(fill=guide_colorbar(title="Log enrichment of number of genes in respective cluster")) + theme_pubr() + theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+```
+```{r fig.height=5, fig.width=10}
+for(stage in stages){
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="peak.width")
+  grid.arrange(g)
+  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_timing_violin_ecdf.pdf"), g, width = 10, height = 5)
+}
 ```
 
 
-## Heatmap per H3K4me3/RNA dynamic
-```{r message=FALSE, warning=FALSE}
-clustering = FALSE
-
-pure_labels <- c("Spermatid.promoter.dna.methyl" = "Spermatid", 
-                 "Sperm.promoter.dna.methyl"="Sperm", 
-                 "Pre.ZGA.promoter.dna.methyl"="Pre-ZGA", 
-                 "Pre.ZGA.promoter.accessibility"="Pre-ZGA", 
-                 "ZGA.expression.9hpf" = "9hpf", 
-                 "ZGA.expression.8hpf" = "8hpf", 
-                 "ZGA.expression.7hpf" = "7hpf",
-                 "ZGA.expression.6hpf" = "6hpf",
-                 "CG.density" ="",
-                 "Spermatid.peak.width" = "Spermatid",
-                 "Sperm.peak.width" = "Sperm",
-                 "Pre.ZGA.peak.width" = "Pre-ZGA",
-                 "ZGA.peak.width" = "ZGA",
-                 "Spermatid.promoter.mean" = "Spermatid",
-                 "Sperm.promoter.mean" = "Sperm",
-                 "Pre.ZGA.promoter.mean" = "Pre-ZGA",
-                 "ZGA.promoter.mean" = "ZGA",
-                 "Spermatid.expression" = "Spermatid")
-
-chip_dyn_map = melt(chip_dyns)
-rownames(chip_dyn_map) <- chip_dyn_map[,1]
-label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
-col_fun = colorRamp2(seq(-2, 2), rev(COL2("RdBu", n=5)))
-
-intersection_list = list()
-for (chip_dyn in names(chip_dyns)) {
-  for (rna_dyn in names(rna_dyns)) {
-    intersection_name <- paste(rna_dyn, chip_dyn, sep = " & ")
-    intersection_list[[intersection_name]] <- intersect(chip_dyns[[chip_dyn]], rna_dyns[[rna_dyn]])
-  }
-}
-
-heatmap_data <- data.frame("Spermatid.peak.width" = chip_dfs[["Spermatid"]][,c("peak.width")],
-                           "Spermatid.promoter.mean" = chip_dfs[["Spermatid"]][,c("promoter.mean")],
-                           "Spermatid.promoter.dna.methyl" = chip_dfs[["Spermatid"]][,c("promoter.dna.methyl")],
-                           "Sperm.peak.width" = chip_dfs[["Sperm"]][,c("peak.width")],
-                           "Sperm.promoter.mean" = chip_dfs[["Sperm"]][,c("promoter.mean")],
-                           "Sperm.promoter.dna.methyl" = chip_dfs[["Sperm"]][,c("promoter.dna.methyl")],
-                           "Pre-ZGA.peak.width" = chip_dfs[["Pre-ZGA"]][,c("peak.width")],
-                           "Pre-ZGA.promoter.mean" = chip_dfs[["Pre-ZGA"]][,c("promoter.mean")],
-                           "Pre-ZGA.promoter.dna.methyl" = chip_dfs[["Pre-ZGA"]][,c("promoter.dna.methyl")],
-                           "Pre-ZGA.promoter.accessibility" = chip_dfs[["Pre-ZGA"]][,c("promoter.accessibility")],
-                           "ZGA.peak.width" = chip_dfs[["ZGA"]][,c("peak.width")],
-                           "ZGA.promoter.mean" = chip_dfs[["ZGA"]][,c("promoter.mean")],
-                           "Spermatid.expression" = chip_dfs[["Spermatid"]][,c("expression")],
-                           "ZGA.expression.6hpf" = chip_dfs[["ZGA"]][,c("expression.6hpf")],
-                           "ZGA.expression.7hpf" = chip_dfs[["ZGA"]][,c("expression.7hpf")],
-                           "ZGA.expression.8hpf" = chip_dfs[["ZGA"]][,c("expression.8hpf")],
-                           "ZGA.expression.9hpf" = chip_dfs[["ZGA"]][,c("expression.9hpf")],
-                           "CG.density" = chip_dfs[["Spermatid"]][,c("cg.density")],
-                           "RNA.group" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns),
-                           "Dynamic" = sapply(allgenes$gene_id, label_dyn, dyns = intersection_list),
-                           "Chip.group" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns))
-
-heatmap_data$RNA.group[is.na(heatmap_data$RNA.group)] <- "ND"
-if(clustered_groups){
-  heatmap_data$RNA.group <- factor(heatmap_data$RNA.group, levels = c("GS", "GZ", "ZS", "ND"))
-}
-
-### RNA plot
-mean_data <- aggregate(. ~  RNA.group, data=heatmap_data[!colnames(heatmap_data) %in% c("Chip.group", "Dynamic")], FUN=mean)
-rownames(mean_data) <- mean_data[,"RNA.group"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
-scaled_data <- t(scaled_data)
-rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm_rna <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation","Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
-)
-draw(hm_rna)
-
-### Chip plot
-mean_data <- aggregate(. ~  Chip.group, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Dynamic", "ZGA.peak.width", "Pre.ZGA.peak.width", "Spermatid.peak.width", "Sperm.peak.width", "ZGA.promoter.mean", "Pre.ZGA.promoter.mean", "Spermatid.promoter.mean", "Sperm.promoter.mean")], FUN=mean)
-rownames(mean_data) <- mean_data[,"Chip.group"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
-scaled_data <- t(scaled_data)
-rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm_chip <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
-)
-draw(hm_chip)
 
 
-mean_data <- aggregate(. ~ Dynamic, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Chip.group")], FUN=mean)
-rownames(mean_data) <- mean_data[,"Dynamic"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
-scaled_data <- t(scaled_data)
-rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation","Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
-)
-draw(hm)
 
-
-```
-
-```{r fig.height=10, fig.width=10}
-cor_labels <- c("Spermatid.promoter.dna.methyl" = "Spermatid DNAme", 
-                 "Sperm.promoter.dna.methyl"="Sperm DNAme", 
-                 "Pre.ZGA.promoter.dna.methyl"="Pre-ZGA DNAme", 
-                 "Pre.ZGA.promoter.accessibility"="Pre-ZGA Accessibility", 
-                 "ZGA.expression.9hpf" = "9hpf RNA expression", 
-                 "ZGA.expression.8hpf" = "8hpf RNA expression", 
-                 "ZGA.expression.7hpf" = "7hpf RNA expression",
-                 "ZGA.expression.6hpf" = "6hpf RNA expression",
-                 "CG.density" ="CG density",
-                 "Spermatid.peak.width" = "Spermatid peak width",
-                 "Sperm.peak.width" = "Sperm peak width",
-                 "Pre.ZGA.peak.width" = "Pre-ZGA peak width",
-                 "ZGA.peak.width" = "ZGA peak width",
-                 "Spermatid.promoter.mean" = "Spermatid promoter mean",
-                 "Sperm.promoter.mean" = "Sperm promoter mean",
-                 "Pre.ZGA.promoter.mean" = "Pre-ZGA promoter mean",
-                 "ZGA.promoter.mean" = "ZGA promoter mean",
-                 "Spermatid.expression" = "Spermatid RNA expression")
-
-df <- heatmap_data[,!colnames(heatmap_data) %in% c("RNA.group", "Chip.group")]
-df <- na.omit(df)
-colnames(df) <- cor_labels[colnames(df)]
-
-corrplot(cor(df, method="pearson"),
-         method = "color",       
-         order = "FPC",
-         col= rev(COL2('RdBu', 200)),
-         tl.col	= "black")
-```
-
-```{r}
-only_prezga = TRUE
-
-complete_data <- heatmap_data
-if(only_prezga){
-  pca_input <- complete_data[,colnames(complete_data) %in% c("Pre.ZGA.promoter.mean", "Pre.ZGA.peak.width", "Pre.ZGA.promoter.dna.methyl", "Pre.ZGA.promoter.accessibility")]
-} else {
-  pca_input <- complete_data[,!colnames(complete_data) %in% c("RNA.group", "Chip.group")]
-}
-df <- na.omit(pca_input)
-  
-if(groups=="chip"){
-  color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"Chip.group"]
-  cols = cols_chipdyns
-}else if(groups=="rna"){
-  color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"RNA.group"]
-  cols = cols_rnadyns
-}
-
-data.pca <- princomp(scale(df), cor=TRUE)
-#summary(data.pca)
-fviz_eig(data.pca, addlabels = TRUE)
-fviz_contrib(data.pca, choice = "var", axes = 1:2)
-fviz_pca_var(data.pca, col.var = "contrib",
-            gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-            repel = TRUE)
-fviz_pca_ind(data.pca,
-             col.ind = color.groups, 
-             palette = cols,
-             label="none",
-             pointsize = 0.5,
-             addEllipses = TRUE, # Concentration ellipses
-             ellipse.type = "norm",
-             legend.title = "Dynamics"
-             )
-```
 

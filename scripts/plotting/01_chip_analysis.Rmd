@@ -99,7 +99,7 @@ chip_dyns_complete_sizes = unlist(lapply(chip_dyns_complete, function(x) length(
 ```{r eval = FALSE}
 response <- readline("Do you want to save the dynamics? (yes/no): ")
 if (tolower(response) == "yes") {
-  save(chip_dyns, chip_dyns_detail, chip_dyns_removed, file="chip_dynamics.RData")
+  save(chip_dyns, chip_dyns_detail, chip_dyns_removed, file="data/processed/chip_dynamics.RData")
 } else {
   print("Dynamics not saved")
 }

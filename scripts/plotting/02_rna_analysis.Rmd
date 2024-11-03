@@ -147,11 +147,7 @@ rna_dyns_timing_sizes = unlist(lapply(rna_dyns_timing, function(x) length(x)))
 ```{r eval = FALSE}
 response <- readline("Do you want to save the dynamics? (yes/no): ")
 if (tolower(response) == "yes") {
-  if(clustered_rna_groups){
-    save(rna_dyns, cols_rna, expression.data, file="rna_data_clustered.RData")
-  } else {
-    save(rna_dyns, cols_rna, expression.data, file="rna_data.RData")
-  }
+    save(rna_dyns, rna_dyns_timing, rna_dyns_complete, expression.data, file="data/processed/rna_dynamics.RData")
 } else {
   print("Dynamics not saved")
 }
