@@ -7,114 +7,13 @@ knitr::opts_knit$set(root.dir = here::here())
 source("scripts/utils.R")
 source("scripts/settings.R")
 ```
-
-##Load genome and fasta (run for uncached binarization or peak calling data)
-```{r warning=FALSE}
-suppressPackageStartupMessages(library(AnnotationDbi))
-Xenla10.1_TxDb <- loadDb("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/Xenla10.1.sqlite")
-allgenes <- genes(Xenla10.1_TxDb)
-rm(Xenla10.1_TxDb)
-
-suppressPackageStartupMessages(library(Biostrings))
-Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
-chr <- names(Xenla10.1_fa[1:18, ])
-rm(Xenla10.1_fa)
-
-promoters <- promoters(allgenes, upstream = 0, downstream = 1)
-promoters_chr <- promoters[seqnames(promoters) %in% chr]
-```
-
-##Utility functions
 ```{r}
-suppressPackageStartupMessages(library(EnrichedHeatmap))
-enrichment <- function(coverage, title, mode="ranges"){
-  if(mode=="ranges"){
-    coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
-  } else if(mode=="coverage"){
-    coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage", value_column = "score")
-  }
-  coverage <- log2(coverage+1)
-  hm <- EnrichedHeatmap(coverage, 
-                        name = "H3K4me3 enrichment",
-                        column_title = title,
-                        col = c("blue", "red"),
-                        axis_name = c("-1kb", "TSS", "+1kb"))
-  draw(hm)
-  return(enriched_score(coverage))
-}
+load("data/processed/dname.RData")
+load("data/processed/accessibility.RData")
+load("data/processed/rna_dynamics.RData")
+load("data/processed/chip_dynamics.RData")
+load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```
-
-##Load DNAme Spermatid
-```{r message=FALSE, warning=FALSE}
-setwd("/Users/marcostock/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/Tobias data/meghana_mbd")
-
-#IP coverage replicates
-spermatid_cov1 <- as(readRDS("GSM1944470_coverage.rds"), "GRanges")
-spermatid_cov2 <- as(readRDS("GSM1944471_coverage.rds"), "GRanges")
-spermatid_cov3 <- as(readRDS("GSM1944472_coverage.rds"), "GRanges")
-spermatid_cov <- c(spermatid_cov1, spermatid_cov2, spermatid_cov3)
-
-#Delete individual replicates
-rm(spermatid_cov1, spermatid_cov2, spermatid_cov3)
-
-DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage")
-```
-
-##Load DNAme Sperm
-```{r message=FALSE, warning=FALSE}
-setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/2_Sperm_DNAme_Teperek_Xl10.1/GSE75164")
-
-#IP coverage replicates
-D2_cov1 <- readRDS("GSM1944464_ranges.rds")
-D2_cov2 <- readRDS("GSM1944465_ranges.rds")
-D2_cov3 <- readRDS("GSM1944466_ranges.rds")
-D2_spDNAme_cov <- c(D2_cov1, D2_cov2, D2_cov3)
-
-#Delete individual replicates
-rm(D2_cov1, D2_cov2, D2_cov3)
-
-suppressWarnings({D2_spDNAme_cov <- resize(D2_spDNAme_cov, 200)})
-D2_spDNAme_cov <- trim(D2_spDNAme_cov)
-D2_spDNAme_cov <- D2_spDNAme_cov[seqnames(D2_spDNAme_cov) %in% chr]
-DNAme_sperm <- enrichment(D2_spDNAme_cov, "DNAme Sperm")
-```
-
-##Load DNAme Pre-ZGA
-```{r message=FALSE, warning=FALSE}
-setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/4_256c_DNAme_own_Xl10.1")
-
-#IP coverage replicates
-D4_cov1 <- readRDS("3a_256c_IP_ranges.rds")
-D4_cov2 <- readRDS("3b_256c_IP_ranges.rds")
-D4_S7DNAme_cov <- c(D4_cov1, D4_cov2)
-
-#Delete individual replicates
-rm(D4_cov1, D4_cov2)
-
-D4_S7DNAme_cov <- D4_S7DNAme_cov[seqnames(D4_S7DNAme_cov) %in% chr]
-DNAme_prezga <- enrichment(D4_S7DNAme_cov, "DNAme Pre-ZGA")
-```
-
-## Accessibility
-```{r}
-setwd("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/5_256c_DamID_own_Xl10.1")
-library(chromstaR)
-
-#read Bam files i.e. coverage files as GRanges objects
-D5_cov1 <- readBamFileAsGRanges(bamfile = "Dam_1_SLX-20130_AR008_s_1_r.sorted.bam", bamindex = "Dam_1_SLX-20130_AR008_s_1_r.sorted.bam.bai")
-D5_cov2 <- readBamFileAsGRanges(bamfile = "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam", bamindex = "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam.bai")
-D5_S7Dam_cov <- c(D5_cov1, D5_cov2)
-
-#Delete individual replicates
-rm(D5_cov1, D5_cov2)
-
-suppressWarnings({D5_S7Dam_cov <- resize(D5_S7Dam_cov, 200)})
-D5_S7Dam_cov <- trim(D5_S7Dam_cov)
-D5_S7Dam_cov <- D5_S7Dam_cov[seqnames(D5_S7Dam_cov) %in% chr]
-
-DamID_prezga <- enrichment(D5_S7Dam_cov, "Accessibility Pre-ZGA")
-```
-
 
 ## CG density
 ```{r}
@@ -123,7 +22,7 @@ promoters_2kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
 promoters_chr_2kb <- promoters_2kb[seqnames(promoters_2kb) %in% chr]
 promoters_chr_2kb <- promoters_chr_2kb[promoters_chr_2kb$gene_id != "LOC108718344"]
 
-Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
+Xenla10.1_fa <- readDNAStringSet("data/raw/genome/XENLA_10.1_genome.fa", "fasta")
 promSeqs <- Xenla10.1_fa[promoters_chr_2kb]
 
 CGgen <- data.frame()

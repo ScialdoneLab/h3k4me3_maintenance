@@ -1,0 +1,51 @@
+---
+title: "Accessibility Preprocessing"
+author: "Marco Stock"
+---
+
+## Setup
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message = FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+
+## Load genome and fasta
+```{r message=FALSE, warning=FALSE}
+Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
+allgenes <- genes(Xenla10.1_TxDb)
+rm(Xenla10.1_TxDb)
+
+Xenla10.1_fa <- readDNAStringSet("data/raw/genome/XENLA_10.1_genome.fa", "fasta")
+chr <- names(Xenla10.1_fa[1:18, ])
+rm(Xenla10.1_fa)
+
+allgenes <- allgenes[seqnames(allgenes) %in% chr]
+promoters_chr <- promoters(allgenes, upstream = 0, downstream = 1)
+```
+
+## Load data
+```{r}
+accessibility_dir <- 'data/raw/accessibility/'
+#read Bam files i.e. coverage files as GRanges objects
+D5_cov1 <- readBamFileAsGRanges(bamfile = paste0(accessibility_dir, "Dam_1_SLX-20130_AR008_s_1_r.sorted.bam"), bamindex = paste0(accessibility_dir, "Dam_1_SLX-20130_AR008_s_1_r.sorted.bam.bai"))
+D5_cov2 <- readBamFileAsGRanges(bamfile = paste0(accessibility_dir, "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam"), bamindex = paste0(accessibility_dir, "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam.bai"))
+D5_S7Dam_cov <- c(D5_cov1, D5_cov2)
+
+#Delete individual replicates
+rm(D5_cov1, D5_cov2)
+
+suppressWarnings({D5_S7Dam_cov <- resize(D5_S7Dam_cov, 200)})
+D5_S7Dam_cov <- trim(D5_S7Dam_cov)
+D5_S7Dam_cov <- D5_S7Dam_cov[seqnames(D5_S7Dam_cov) %in% chr]
+
+DamID_prezga <- enrichment(D5_S7Dam_cov, "Accessibility Pre-ZGA", value_name="Accessibility (log2+1)", enriched_score=TRUE)
+```
+
+```{r}
+# Save data
+save(DamID_prezga, file = paste0("data/processed/accessibility.RData"))
+```

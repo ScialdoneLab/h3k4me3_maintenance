@@ -1,4 +1,4 @@
-packages <- c("here", "ggplot2", "ChIPpeakAnno", "reshape2", "AnnotationDbi", "eulerr", "PerformanceAnalytics", "factoextra",
+packages <- c("here", "ggplot2", "ChIPpeakAnno", "reshape2", "AnnotationDbi", "eulerr", "PerformanceAnalytics", "factoextra", "chromstaR", 
 "clusterProfiler", "org.Xl.eg.db", "simplifyEnrichment", "gridExtra", "grid", "plyr", "ggalluvial", "tidyr", "scales", "corrplot", "RColorBrewer", "ComplexUpset",
 "dplyr", "ggpubr", "Biostrings", "EnrichedHeatmap", "rtracklayer", "SummarizedExperiment", "Seurat", "circlize", "ComplexHeatmap", "reshape2")
 lapply(packages, require, character.only = TRUE)
@@ -26,16 +26,25 @@ readGranges <- function(filename) {
   granges <- trim(granges)
   granges_chr <- granges[seqnames(granges) %in% chr]
 }
-enrichment <- function(coverage, title) {
-  coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage") # , value_column = "score")
-  coverage <- log2(coverage + 1)
-  hm <- EnrichedHeatmap(coverage,
-    name = "H3K4me3 enrichment",
-    column_title = title,
-    col = c("blue", "red"),
-    axis_name = c("-1kb", "TSS", "+1kb")
-  )
+
+enrichment <- function(coverage, title, mode="ranges", value_name="H3K4me3 enrichment", enriched_score=FALSE){
+  if(mode=="ranges"){
+    coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
+  } else if(mode=="coverage"){
+    coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage", value_column = "score")
+  }
+  coverage <- log2(coverage+1)
+  hm <- EnrichedHeatmap(coverage, 
+                        name = value_name,
+                        column_title = title,
+                        col = c("blue", "red"),
+                        axis_name = c("-1kb", "TSS", "+1kb"))
   draw(hm)
+  if(enriched_score){
+    return(enriched_score(coverage))
+  }else{
+
+  }
   return(coverage)
 }
 
