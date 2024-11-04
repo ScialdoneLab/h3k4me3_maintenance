@@ -1,0 +1,51 @@
+---
+title: "CG Density Preprocessing"
+author: "Marco Stock"
+---
+
+## Setup
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message = FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+
+## Load genome
+```{r}
+Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
+allgenes <- genes(Xenla10.1_TxDb)
+rm(Xenla10.1_TxDb)
+
+Xenla10.1_fa <- readDNAStringSet("data/raw/genome/XENLA_10.1_genome.fa", "fasta")
+chr <- names(Xenla10.1_fa[1:18, ])
+
+promoters_2kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
+promoters_chr_2kb <- promoters_2kb[seqnames(promoters_2kb) %in% chr]
+promoters_chr_2kb <- promoters_chr_2kb[promoters_chr_2kb$gene_id != "LOC108718344"]
+
+promSeqs <- Xenla10.1_fa[promoters_chr_2kb]
+rm(Xenla10.1_fa)
+```
+
+## CG density
+```{r}
+CGgen <- data.frame()
+for (i in 1:length(promSeqs)) {
+  freq <- dinucleotideFrequency(promSeqs[i])[7]
+  row <- c(names(promSeqs[i]), freq/2000)
+  CGgen <- rbind(CGgen, row)
+}
+
+cg_density <- as.numeric(CGgen[,2])
+names(cg_density) <- CGgen[,1]
+cg_density["LOC108718344"] <- NA
+cg_density <- cg_density[allgenes$gene_id]
+```
+
+```{r}
+# Save data
+save(cg_density, file = paste0("data/processed/cg_density.RData"))
+```

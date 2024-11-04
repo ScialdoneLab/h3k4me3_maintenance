@@ -1,0 +1,26 @@
+---
+title: "Auxin analysis"
+author: "Marco Stock"
+---
+
+## Setup
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message = FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+```{r}
+print(getwd())
+print(axis_titles)
+```
+
+```{r}
+plot(plot_stage_dynamics("Pre-ZGA", type="promoter.accessibility", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("Pre-ZGA", type="promoter.dna.methyl", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("Sperm", type="promoter.dna.methyl", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("Spermatid", type="promoter.dna.methyl", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+plot(plot_stage_dynamics("Spermatid", type="cg.density", groups, remove_NA=TRUE, onlypeaks=FALSE, grouped=FALSE, legend=FALSE))
+```

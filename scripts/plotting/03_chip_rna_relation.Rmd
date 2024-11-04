@@ -3,7 +3,7 @@ title: "Chip/RNA relation analysis"
 author: "Marco Stock"
 ---
 
-## Settings
+## Setup
 ```{r include = FALSE}
 library(here)
 knitr::opts_knit$set(root.dir = here::here())
@@ -16,20 +16,6 @@ source("scripts/settings.R")
 load("data/processed/rna_dynamics.RData")
 load("data/processed/chip_dynamics.RData")
 load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
-```
-
-## Bind expression and chip data
-```{r message=FALSE, warning=FALSE}
-chip_dfs[["Spermatid"]]$expression <- log(expression.data[["Spermatid"]] + 1)
-chip_dfs[["ZGA"]]$expression.6hpf <- log(expression.data[["6hpf"]] + 1)
-chip_dfs[["ZGA"]]$expression.7hpf <- log(expression.data[["7hpf"]] + 1)
-chip_dfs[["ZGA"]]$expression.8hpf <- log(expression.data[["8hpf"]] + 1)
-chip_dfs[["ZGA"]]$expression.9hpf <- log(expression.data[["9hpf"]] + 1)
-chip_dfs[["Spermatid"]]$expression[is.na(chip_dfs[["Spermatid"]]$expression)] <- 0
-chip_dfs[["ZGA"]]$expression.6hpf[is.na(chip_dfs[["ZGA"]]$expression.6hpf)] <- 0
-chip_dfs[["ZGA"]]$expression.7hpf[is.na(chip_dfs[["ZGA"]]$expression.7hpf)] <- 0
-chip_dfs[["ZGA"]]$expression.8hpf[is.na(chip_dfs[["ZGA"]]$expression.8hpf)] <- 0
-chip_dfs[["ZGA"]]$expression.9hpf[is.na(chip_dfs[["ZGA"]]$expression.9hpf)] <- 0
 ```
 
 ## Balloon plots

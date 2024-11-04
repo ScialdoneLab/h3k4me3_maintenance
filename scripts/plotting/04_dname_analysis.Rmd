@@ -1,0 +1,23 @@
+---
+title: "DNAme analysis"
+author: "Marco Stock"
+---
+
+## Setup
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message=FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+```{r}
+load("data/processed/dname.RData")
+load("data/processed/accessibility.RData")
+load("data/processed/rna_dynamics.RData")
+load("data/processed/chip_dynamics.RData")
+load("data/processed/cg_density.RData")
+load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
+```
+

@@ -3,7 +3,7 @@ title: "H3K4me3 Preprocessing"
 author: "Marco Stock"
 ---
 
-## Settings
+## Setup
 ```{r include = FALSE}
 library(here)
 knitr::opts_knit$set(root.dir = here::here())

@@ -1,0 +1,30 @@
+---
+title: "Morpholinos analysis"
+author: "Marco Stock"
+---
+
+## Setup
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message = FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+
+##Load genome and fasta (run for uncached binarization or peak calling data)
+```{r warning=FALSE}
+suppressPackageStartupMessages(library(AnnotationDbi))
+Xenla10.1_TxDb <- loadDb("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/Xenla10.1.sqlite")
+allgenes <- genes(Xenla10.1_TxDb)
+rm(Xenla10.1_TxDb)
+
+suppressPackageStartupMessages(library(Biostrings))
+Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
+chr <- names(Xenla10.1_fa[1:18, ])
+rm(Xenla10.1_fa)
+
+promoters <- promoters(allgenes, upstream = 0, downstream = 1)
+promoters_chr <- promoters[seqnames(promoters) %in% chr]
+```
