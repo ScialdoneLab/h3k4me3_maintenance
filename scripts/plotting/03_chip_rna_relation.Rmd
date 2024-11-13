@@ -61,7 +61,7 @@ for(stage in stages){
 ```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
 for(stage in stages){
   plot_peak(stage=stage, dyns=rna_dyns_timing, cols=cols_rna_timing, remove_NA=TRUE, onlypeaks=FALSE)
-  ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_peak_plot.pdf"), width = 5, height = 4)
+  ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_peak_plot.pdf"), width = 5, height = 3)
 }
 ```
 
@@ -99,37 +99,55 @@ genesAbsolute_mod["Other", ] <- colSums(genesAbsolute[c("Recovered", "Lost", "Ga
 ggdf1 <- melt(cbind(genesAbsolute_mod, rownames(genesAbsolute_mod)))
 names(ggdf1)<- c("H3K4me3", "RNA", "count")
 ggdf1$H3K4me3 <- factor(ggdf1$H3K4me3, levels=c("Kept", "Other", "Absent"))
-ggplot(ggdf1, aes(fill=H3K4me3, y=count, x=RNA)) + geom_bar(position="fill", stat="identity") + theme_bw() + ylab("%") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), axis.title.x = element_blank(), legend.title=element_blank()) + scale_fill_manual(values = cols_mod) + theme_pubr() 
-ggsave('output/rna_chip/ratio_h3k4me3_rna_dynamics_stacked.pdf', width=5, height=4)
+ggplot(ggdf1, aes(fill=H3K4me3, y=count, x=RNA)) + 
+  geom_bar(position="fill", stat="identity") + 
+  theme_bw() + 
+  ylab(NULL) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title.x = element_blank(), 
+        legend.title=element_blank(), 
+        legend.position="right") + 
+  scale_fill_manual(values = cols_mod) + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_pubr()
+ggsave('output/rna_chip/ratio_h3k4me3_rna_dynamics_stacked.pdf', width=5, height=3)
 ```
 
 ## Violin plots of H3K4me3 for RNA groups
 ```{r fig.height=5, fig.width=10}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="promoter.mean", only_violin = TRUE)
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="promoter.mean", plot = "violin")
   grid.arrange(g)
   ggsave(file=paste0("output/rna_chip/", stage, "_rna_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 }
 ```
 ```{r fig.height=5, fig.width=10}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="peak.width")
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="peak.width", plot = "violin")
   grid.arrange(g)
-  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
+
+    g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="peak.width", plot = "ecdf")
+  grid.arrange(g)
+  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_dynamics_ecdf_plot.pdf"), g, width = 5, height = 4)
 }
 ```
 ```{r fig.height=5, fig.width=10}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="promoter.mean")
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="promoter.mean", plot = "violin")
   grid.arrange(g)
-  ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_violin_ecdf.pdf"), g, width = 10, height = 5)
+  ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_violin_plot.pdf"), g, width = 5, height = 4)
 }
 ```
 ```{r fig.height=5, fig.width=10}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="peak.width")
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="peak.width", plot="violin")
   grid.arrange(g)
-  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_timing_violin_ecdf.pdf"), g, width = 10, height = 5)
+  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_timing_violin_plot.pdf"), g, width = 5, height = 4)
+
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="peak.width", plot="ecdf")
+  grid.arrange(g)
+  ggsave(file=paste0("output/rna_chip/", stage, "_peak_width_rna_timing_ecdf_plot.pdf"), g, width = 5, height = 4)
 }
 ```
 

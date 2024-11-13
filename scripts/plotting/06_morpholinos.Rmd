@@ -13,18 +13,246 @@ source("scripts/utils.R")
 source("scripts/settings.R")
 ```
 
-##Load genome and fasta (run for uncached binarization or peak calling data)
-```{r warning=FALSE}
-suppressPackageStartupMessages(library(AnnotationDbi))
-Xenla10.1_TxDb <- loadDb("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/Xenla10.1.sqlite")
-allgenes <- genes(Xenla10.1_TxDb)
-rm(Xenla10.1_TxDb)
+## Load data
+```{r}
+load("data/processed/rna_dynamics.RData")
+load("data/processed/chip_dynamics.RData")
 
-suppressPackageStartupMessages(library(Biostrings))
-Xenla10.1_fa <- readDNAStringSet("~/Documents/PhD/01_Projects/NT/Meghana_H3K4me3/NGS_data_sorted/Genome_Xl10.1/XENLA_10.1_genome.fa", "fasta")
-chr <- names(Xenla10.1_fa[1:18, ])
-rm(Xenla10.1_fa)
+morpholino_dir <- "data/raw/morpholinos/"
+se <- readRDS(paste0(morpholino_dir, "se_kal.rds"))
 
-promoters <- promoters(allgenes, upstream = 0, downstream = 1)
-promoters_chr <- promoters[seqnames(promoters) %in% chr]
+mapnames <- se@elementMetadata@listData$name
+names(mapnames) <- se@elementMetadata@listData$id
+```
+
+```{r}
+plot_morpholino <- function(rep, control, zygotic_only, plot = "heatmap", dynamic = NULL, tp = NULL, only_de=FALSE, hm_rows="de") {
+    if (zygotic_only) {
+        se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
+    }
+    se <- se[, sapply(se@colData@listData$group, function(x) extracted <- regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep]
+
+    tpms <- se@assays@data@listData$tpms
+    tpms <- tpms[!(mapnames[rownames(tpms)] %in% names(table(mapnames)[table(mapnames) > 1])), ]
+    tpms <- tpms[complete.cases(tpms), ]
+
+    groups <- se@colData@listData$group
+    reps <- sapply(groups, function(x) extracted <- regmatches(x, regexpr("\\b(I{1,3})\\b", x)))
+    technical_reps <- sapply(groups, function(x) substr(x, nchar(x), nchar(x)))
+    timepoints <- sapply(groups, function(x) extracted <- regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])
+    conditions <- sapply(groups, function(x) extracted <- sub(" 256c(.*)", "", x))
+
+    valid_indices <- timepoints != timepoints[1] & conditions != "Wdr5 MO"
+    tpms <- tpms[, valid_indices]
+    groups <- groups[valid_indices]
+    reps <- reps[valid_indices]
+    technical_reps <- technical_reps[valid_indices]
+    conditions <- conditions[valid_indices]
+    timepoints <- timepoints[valid_indices]
+
+    tpms_ctrl_normalize <- function(group, pseudocount = 1) {
+        timepoint <- regmatches(group, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", group))[1]
+        mean_ctrl <- rowMeans(tpms[, timepoints == timepoint & conditions == control])
+        return((tpms[, group == groups] + pseudocount) / (mean_ctrl + pseudocount))
+    }
+
+    tpms_norm <- as.data.frame(sapply(groups, tpms_ctrl_normalize))
+    rownames(tpms_norm) <- mapnames[rownames(tpms_norm)]
+    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+
+    if (plot == "violin") {
+        tpms_norm <- tpms_norm[, reps == rep & timepoints == names(table(timepoints))[tp] & conditions != "NI Ctrl"]
+        # actual_conditions <- sub("..$", "", colnames(tpms_norm))
+        # mean_tpms_norm <- sapply(unique(actual_conditions), function(cond) {
+        #    rowMeans(tpms_norm[, actual_conditions == cond, drop = FALSE])
+        # })
+        # mean_tpms_norm <- as.data.frame(mean_tpms_norm)
+        # rownames(mean_tpms_norm) <- rownames(tpms_norm)
+        tpms_norm$genes <- rownames(tpms_norm)
+        tpms_norm <- melt(tpms_norm, variable.name = "condition", value.name = "value", na.rm = TRUE)
+        tpms_norm$condition <- sub("..$", "", tpms_norm$condition)
+        tpms_norm$dyn <- sapply(tpms_norm$genes, label_dyn, dyns = chip_dyns)
+        tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+
+        ctrl <- names(table(tpms_norm$condition))[grep("Ctrl MO", names(table(tpms_norm$condition)))]
+        cxxc1 <- names(table(tpms_norm$condition))[grep("Cxxc1 MO", names(table(tpms_norm$condition)))]
+        kmt2b <- names(table(tpms_norm$condition))[grep("Kmt2b MO", names(table(tpms_norm$condition)))]
+
+        ggviolin(tpms_norm, x = "condition", y = "value", fill = "condition", add = "boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) +
+            labs(y = "fold change", x = NULL, title = paste(dynamic, "& Zygotic (", names(table(timepoints))[tp], ")")) +
+            theme_pubr() +
+            theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+            scale_x_discrete(limits = c(ctrl, cxxc1, kmt2b), labels = function(x) sapply(strsplit(x, " "), `[`, 1)) +
+            scale_fill_manual(values = setNames(c("#E1DCC9", "#17395C", "#EFB758"), c(ctrl, cxxc1, kmt2b))) +
+            stat_compare_means(
+                comparisons = list(c(kmt2b, ctrl), c(cxxc1, ctrl)),
+                method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"),
+                label.y = c(2.4, 2.7)
+            ) +
+            geom_hline(yintercept = 1, linetype = "dotted") +
+            coord_cartesian(ylim = c(0, 3))
+    } else {
+        de_timepoints <- c("1hr", "2hr", "3hr")
+        de_conditions <- c("Cxxc1", "Kmt2b")
+        files <- expand.grid(timepoint = de_timepoints, condition = de_conditions)
+
+        read_de_res <- function(idx, direction) {
+            timepoint <- files[idx, "timepoint"]
+            condition <- files[idx, "condition"]
+            rds <- readRDS(paste0(morpholino_dir, "res__", rep, "_", timepoint, "_", condition, "_MO_", timepoint, "_vs_", gsub(" ", "_", control), "_", timepoint, ".rds"))
+            rds <- na.omit(rds, cols = c("padj", "log2FoldChange"))
+            if (direction == "up") {
+                res <- rownames(rds[rds$padj < 0.05 & rds$log2FoldChange > 0, ])
+                return(mapnames[intersect(res, rownames(tpms))])
+            } else if (direction == "down") {
+                res <- rownames(rds[rds$padj < 0.05 & rds$log2FoldChange < 0, ])
+                return(mapnames[intersect(res, rownames(tpms))])
+            }
+        }
+
+        up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up")))
+        down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down")))
+        de_list <- list("up" = up_list, "down" = down_list, "no change"=setdiff(rownames(tpms_norm), union(up_list, down_list)))
+
+        if (zygotic_only) {
+            tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(rna_dyns$GZ, rna_dyns$ZS),]
+        }
+
+        if(only_de){
+         tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(up_list, down_list),]
+        }
+
+        conditions_order <- c("NI Ctrl", "Ctrl MO", "Cxxc1 MO", "Kmt2b MO")
+        column_order <- expand.grid(tech_rep = c(1, 2, 3), timepoint = names(table(timepoints))[1:3], condition = conditions_order)
+
+        str_column_order <- paste(
+            column_order$condition, column_order$timepoint,
+            "Rep", paste0(rep, ".", column_order$tech_rep)
+        )
+        # str_column_order = str_column_order[!str_column_order %in% c("Ctrl MO 256c+1hr Rep I.2", "Kmt2b MO 256c+1hr Rep I.3")]
+
+        tpms_norm <- tpms_norm[, str_column_order] # sample(1:nrow(tpms_norm), 1000)
+        tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+
+        if(hm_rows == "chip_dyns"){
+            row_slices = chip_dyns[names(chip_dyns) %in% c("Kept", "Gained", "Absent")]
+            tpms_norm <- tpms_norm[rownames(tpms_norm) %in% unlist(row_slices),]
+            row_split <- factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = row_slices), "& Zygotic"), levels = c("Gained & Zygotic", "Kept & Zygotic", "Absent & Zygotic"))
+        } else if (hm_rows == "de"){
+            row_slices = de_list
+            tpms_norm <- tpms_norm[rownames(tpms_norm) %in% unlist(row_slices),]
+            row_split <- factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = row_slices), "& Zygotic"), levels = c("up & Zygotic", "down & Zygotic", "no change & Zygotic"))
+        }
+
+        col_fun <- colorRamp2(c(0, 1, 2), c("blue", "white", "red"))
+        hm <- Heatmap(tpms_norm,
+            use_raster = TRUE,
+            col = col_fun,
+            name = "fold change",
+            column_split = column_order$condition,
+            cluster_columns = FALSE,
+            cluster_column_slices = FALSE,
+            cluster_row_slices = FALSE,
+            row_split = row_split,
+            show_row_names = FALSE,
+            show_row_dend = FALSE,
+            row_title_rot = 0
+        )
+
+        tpms_norm$rna_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = rna_dyns)
+        hm_rna <- Heatmap(tpms_norm$rna_dyn,
+            use_raster = TRUE,
+            name = "RNA dynamic",
+            col = cols_rna,
+        )
+
+        tpms_norm$chip_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = chip_dyns)
+        hm_chip <- Heatmap(tpms_norm$chip_dyn,
+            use_raster = TRUE,
+            name = "H3K4me3 dynamic",
+            col = cols_chip,
+        )
+
+        tpms_norm$de_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = de_list)
+        tpms_norm$de_dyn[is.na(tpms_norm$de_dyn)] <- "no change"
+        hm_de <- Heatmap(tpms_norm$de_dyn,
+            use_raster = TRUE,
+            name = "Differential expression",
+            col = c("down" = "#2A2D7C", "up" = "#CD2027", "no change" = "#BFBEBE"),
+        )
+
+        if(hm_rows == "chip_dyns"){
+            hm <- hm + hm_de + hm_rna
+        }else if(hm_rows =="de"){
+            hm <- hm + hm_chip + hm_rna
+        }
+        
+        return(hm)
+    }
+}
+```
+
+## Violin comparision of fold change
+```{r}
+control <- "Ctrl MO" # Ctrl MO or NI Ctrl
+zygotic_only <- TRUE
+
+for (rep in c("I", "II")) {
+    for (dyn in c("Kept", "Gained")) {
+        for (tp in 1:3) {
+            plot_morpholino(rep, control, zygotic_only, plot = "violin", dynamic = dyn, tp = tp)
+            ggsave(paste0("output/morpholinos/violin_zygotic_rep", rep, "_", dyn, "_t", tp, ".pdf"), width = 5, height = 4)
+        }
+    }
+}
+```
+
+## Heatmaps of fold change
+```{r}
+control <- "Ctrl MO" # Ctrl MO or NI Ctrl
+zygotic_only <- TRUE
+
+for (rep in c("I", "II")) {
+    hm <- plot_morpholino(rep, control, zygotic_only, plot = "heatmap")
+    pdf(paste0("output/morpholinos/heatmap_zygotic_rep", rep, ".pdf"), width = 10, height = 5)
+    draw(hm)
+    dev.off()
+    draw(hm)
+}
+```
+
+
+## Violin comparision of fold change
+```{r}
+control <- "Ctrl MO" # Ctrl MO or NI Ctrl
+zygotic_only <- TRUE
+experiment_type <- "morpholino"
+
+for (rep in c("I", "II")) {
+    for (dyn in c("Kept", "Gained")) {
+        for (tp in 1:3) {
+            se <- preprocess_data(rep, zygotic_only, experiment_type)
+            tpms_norm <- normalize_tpms(se, control, experiment_type)
+            plot_violin(tpms_norm, rep, tp, dyn, experiment_type)
+            ggsave(paste0("output/morpholinos/violin_zygotic_rep", rep, "_", dyn, "_t", tp, ".pdf"), width = 5, height = 4)
+        }
+    }
+}
+```
+
+## Heatmaps of fold change
+```{r}
+control <- "Ctrl MO" # Ctrl MO or NI Ctrl
+zygotic_only <- TRUE
+experiment_type <- "morpholino"
+
+for (rep in c("I", "II")) {
+    se <- preprocess_data(rep, zygotic_only, experiment_type)
+    tpms_norm <- normalize_tpms(se, control, experiment_type)
+    hm <- plot_heatmap(tpms_norm, rep, experiment_type)
+    pdf(paste0("output/morpholinos/heatmap_zygotic_rep", rep, ".pdf"), width = 10, height = 5)
+    draw(hm)
+    dev.off()
+    draw(hm)
+}
 ```

@@ -24,10 +24,10 @@ load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```{r}
 chip_dfs[["Spermatid"]]$cg.density <- unname(cg_density[allgenes$gene_id])
 chip_dfs[["Spermatid"]]$cg.density[is.na(chip_dfs[["Spermatid"]]$cg.density)] <- 0
-chip_dfs[["Spermatid"]]$promoter.dna.methyl <- DNAme_spermatid
-chip_dfs[["Sperm"]]$promoter.dna.methyl <- DNAme_sperm
-chip_dfs[["Pre-ZGA"]]$promoter.dna.methyl <- DNAme_prezga
-chip_dfs[["Pre-ZGA"]]$promoter.accessibility <- DamID_prezga
+chip_dfs[["Spermatid"]]$promoter.dna.methyl <- DNAme_dfs[["Spermatid"]]
+chip_dfs[["Sperm"]]$promoter.dna.methyl <- DNAme_dfs[["Sperm"]]$promoter.mean
+chip_dfs[["Pre-ZGA"]]$promoter.dna.methyl <- DNAme_dfs[["Pre-ZGA"]]$promoter.mean
+chip_dfs[["Pre-ZGA"]]$promoter.accessibility <- accessibility_df
 
 chip_dfs[["Spermatid"]]$expression <- log(expression.data[["Spermatid"]] + 1)
 chip_dfs[["ZGA"]]$expression.6hpf <- log(expression.data[["6hpf"]] + 1)
@@ -41,84 +41,233 @@ chip_dfs[["ZGA"]]$expression.8hpf[is.na(chip_dfs[["ZGA"]]$expression.8hpf)] <- 0
 chip_dfs[["ZGA"]]$expression.9hpf[is.na(chip_dfs[["ZGA"]]$expression.9hpf)] <- 0
 ```
 
-## Violin / ECDF plots RNA dynamics
-```{r fig.height=5, fig.width=10}
-g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint="Pre-ZGA", type="promoter.accessibility")
-grid.arrange(g)
-ggsave(file=paste0("output/multiomic/pre_zga_accessibility_rna_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
-
-for(stage in c("Spermatid", "Sperm", "Pre-ZGA")){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="promoter.dna.methyl")
-  grid.arrange(g)
-  ggsave(file=paste0("output/multiomic/", stage, "_dname_rna_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+## Genomic distribution of peaks
+```{r}
+gg_color_hue <- function(n) {
+  hues <- seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
 }
 
-g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint="Spermatid", type="cg.density")
+Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
+pre_zga_data <- list("H3K4me3" = h3k4stages[["Pre-ZGA"]], "DNAme" = DNAme_stages[["Pre-ZGA"]], "Accessibility" = accessibility_stage)
+genodis <- lapply(pre_zga_data, function(x) {
+  assignChromosomeRegion(x,
+    nucleotideLevel = FALSE, proximal.promoter.cutoff = c(upstream = 1000, downstream = 1000), precedence = c("Promoters", "immediateDownstream", "fiveUTRs", "threeUTRs", "Exons", "Introns"),
+    TxDb = Xenla10.1_TxDb
+  )
+})
+b <- matrix(unlist(genodis), nrow = 14)
+genodis2 <- b[1:7, ]
+colnames(genodis2) <- names(pre_zga_data)
+rownames(genodis2) <- c("Promoters", "ImmediateDownstream", "FiveUTRs", "ThreeUTRs", "Exons", "Introns", "Intergenic regions")
+ggdf1 <- melt(genodis2)
+ggdf1$Var1 <- factor(ggdf1$Var1, levels = rev(rownames(genodis2)))
+ggplot(ggdf1, aes(fill = Var1, y = value, x = Var2)) +
+  geom_bar(position = "stack", stat = "identity") +
+  theme_bw() +
+  ylab("%") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), axis.title.x = element_blank(), legend.title = element_blank()) +
+  ggtitle("Pre-ZGA") +
+  scale_fill_manual(values = c("grey", gg_color_hue(6)))
+ggsave("output/multiomic/pre_zga_multiomic_genomic_distribution.pdf", width = 3, height = 3)
+
+rm(Xenla10.1_TxDb)
+```
+
+## EnrichedHeatmaps
+```{r}
+h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
+  use_raster = TRUE,
+  name = "H3K4me3",
+  column_title = "H3K4me3",
+  width = 4,
+  axis_name = c("-1kb", "TSS", "+1kb"),
+  col = colorRamp2(c(0, 6), c("white", "#2B539A")),
+  top_annotation = HeatmapAnnotation(enrich = anno_enriched(axis_param = list(side = "left"), gp = gpar(col = 1)))
+)
+
+dname_heatmap <- EnrichedHeatmap(DNAme_norm_mats[["Pre-ZGA"]],
+  use_raster = TRUE,
+  name = "DNAme",
+  column_title = "DNAme",
+  width = 4,
+  axis_name = c("-1kb", "TSS", "+1kb"),
+  col = colorRamp2(c(0, 2), c("white", "#8D396D")),
+  top_annotation = HeatmapAnnotation(enrich = anno_enriched(gp = gpar(col = 1)))
+)
+
+cg_density_heatmap <- Heatmap(log2(unname(cg_density[allgenes$gene_id]+1)),
+  use_raster = TRUE,
+  show_row_names = FALSE,
+  show_row_dend = FALSE,
+  cluster_rows = FALSE,
+  width = 1,
+  column_title = "",
+  column_title_side = "top",
+  name = "CG density",
+  col = colorRamp2(c(0, 0.05), c("white", "black")),
+)
+
+hm <- h3k4me3_heatmap + dname_heatmap + cg_density_heatmap
+draw(hm)
+
+pdf("output/multiomic/enriched_heatmap_h3k4me3_dname_cg_density.pdf", width = 5, height = 8)
+draw(hm)
+dev.off()
+```
+ 
+
+## EnrichedHeatmap with accessibility split
+```{r} 
+set.seed(123)
+accessibility_df <- EnrichedHeatmap(accessibility_norm_mat,
+  use_raster = TRUE,
+  name = "Accessibility",
+  column_title = "Accessibility",
+  width = 4,
+  axis_name = c("-1kb", "TSS", "+1kb"),
+  col = colorRamp2(c(0, 5), c("white", "#BB3A36")),
+  row_km = 2,
+  top_annotation = HeatmapAnnotation(enrich = anno_enriched(axis_param = list(side = "left"), gp = gpar(col = 1)))
+)
+
+h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
+  use_raster = TRUE,
+  name = "H3K4me3",
+  column_title = "H3K4me3",
+  width = 4,
+  axis_name = c("-1kb", "TSS", "+1kb"),
+  col = colorRamp2(c(0, 6), c("white", "#2B539A")),
+  top_annotation = HeatmapAnnotation(enrich = anno_enriched(axis_param = list(side = "right"), gp = gpar(col = 1)))
+)
+
+hm <- accessibility_df + h3k4me3_heatmap
+draw(hm)
+
+pdf("output/multiomic/enriched_heatmap_h3k4me3_accessibility.pdf", width = 4, height = 6)
+draw(hm)
+dev.off()
+```
+
+## Peak plots
+```{r}
+for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
+  plot_peak(DNAme_norm_mats, stage = stage, dyns = rna_dyns, cols = cols_rna, remove_NA = TRUE, onlypeaks = FALSE, label = "DNAme")
+  ggsave(file = paste0("output/multiomic/", stage, "_dname_rna_dynamics_peak.pdf"), width = 5, height = 4)
+}
+```
+```{r}
+for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
+  plot_peak(DNAme_norm_mats, stage = stage, dyns = rna_dyns_timing, cols = cols_rna_timing, remove_NA = TRUE, onlypeaks = FALSE, label = "DNAme")
+  ggsave(file = paste0("output/multiomic/", stage, "_dname_rna_timing_dynamics_peak.pdf"), width = 5, height = 4)
+}
+```
+```{r}
+for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
+  plot_peak(DNAme_norm_mats, stage = stage, dyns = chip_dyns, cols = cols_chip, remove_NA = TRUE, onlypeaks = FALSE, label = "DNAme")
+  ggsave(file = paste0("output/multiomic/", stage, "_dname_chip_dynamics_peak.pdf"), width = 5, height = 4)
+}
+```
+```{r}
+plot_peak(accessibility_norm_mat, stage = "Pre-ZGA", dyns = rna_dyns, cols = cols_rna, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
+ggsave(file = paste0("output/multiomic/", stage, "_accessibility_rna_dynamics_peak.pdf"), width = 5, height = 4)
+```
+```{r}
+plot_peak(accessibility_norm_mat, stage = "Pre-ZGA", dyns = rna_dyns_timing, cols = cols_rna_timing, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
+ggsave(file = paste0("output/multiomic/", stage, "_accessibility_rna_timing_dynamics_peak.pdf"), width = 5, height = 4)
+```
+```{r}
+plot_peak(accessibility_norm_mat, stage = "Pre-ZGA", dyns = chip_dyns, cols = cols_chip, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
+ggsave(file = paste0("output/multiomic/", stage, "_accessibility_chip_dynamics_peak.pdf"), width = 5, height = 4)
+```
+
+## Violin / ECDF plots RNA dynamics
+```{r fig.height=5, fig.width=10}
+g <- plot_stage_dynamics(chip_dfs, dyns = rna_dyns, cols = cols_rna, timepoint = "Pre-ZGA", type = "promoter.accessibility", plot = "violin")
 grid.arrange(g)
-ggsave(file=paste0("output/multiomic/cg_density_rna_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+ggsave(file = paste0("output/multiomic/pre_zga_accessibility_rna_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
+
+for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
+  g <- plot_stage_dynamics(chip_dfs, dyns = rna_dyns, cols = cols_rna, timepoint = stage, type = "promoter.dna.methyl", plot = "violin")
+  grid.arrange(g)
+  ggsave(file = paste0("output/multiomic/", stage, "_dname_rna_dynamics_violin.pdf"), g, width = 5, height = 4)
+}
+
+g <- plot_stage_dynamics(chip_dfs, dyns = rna_dyns, cols = cols_rna, timepoint = "Spermatid", type = "cg.density", plot = "violin")
+grid.arrange(g)
+ggsave(file = paste0("output/multiomic/cg_density_rna_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 ```
 
 ## Violin / ECDF plots RNA timing dynamics
 ```{r fig.height=5, fig.width=10}
-g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="Pre-ZGA", type="promoter.accessibility")
+g <- plot_stage_dynamics(chip_dfs, dyns = rna_dyns_timing, cols = cols_rna_timing, timepoint = "Pre-ZGA", type = "promoter.accessibility", plot = "violin")
 grid.arrange(g)
-ggsave(file=paste0("output/multiomic/pre_zga_accessibility_rna_timing_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+ggsave(file = paste0("output/multiomic/pre_zga_accessibility_rna_timing_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 
-for(stage in c("Spermatid", "Sperm", "Pre-ZGA")){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="promoter.dna.methyl")
+for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
+  g <- plot_stage_dynamics(chip_dfs, dyns = rna_dyns_timing, cols = cols_rna_timing, timepoint = stage, type = "promoter.dna.methyl", plot = "violin")
   grid.arrange(g)
-  ggsave(file=paste0("output/multiomic/", stage, "_dname_rna_timing_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+  ggsave(file = paste0("output/multiomic/", stage, "_dname_rna_timing_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 }
 
-g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="Spermatid", type="cg.density")
+g <- plot_stage_dynamics(chip_dfs, dyns = rna_dyns_timing, cols = cols_rna_timing, timepoint = "Spermatid", type = "cg.density", plot = "violin")
 grid.arrange(g)
-ggsave(file=paste0("output/multiomic/cg_density_rna_timing_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+ggsave(file = paste0("output/multiomic/cg_density_rna_timing_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 ```
 
 ## Violin / ECDF plots Chip dynamics
 ```{r fig.height=5, fig.width=10}
-g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint="Pre-ZGA", type="promoter.accessibility")
+g <- plot_stage_dynamics(chip_dfs, dyns = chip_dyns, cols = cols_chip, timepoint = "Pre-ZGA", type = "promoter.accessibility", plot = "violin")
 grid.arrange(g)
-ggsave(file=paste0("output/multiomic/pre_zga_accessibility_chip_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+ggsave(file = paste0("output/multiomic/pre_zga_accessibility_chip_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 
-for(stage in c("Spermatid", "Sperm", "Pre-ZGA")){
-  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.dna.methyl")
+for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
+  g <- plot_stage_dynamics(chip_dfs, dyns = chip_dyns, cols = cols_chip, timepoint = stage, type = "promoter.dna.methyl", plot = "violin")
   grid.arrange(g)
-  ggsave(file=paste0("output/multiomic/", stage, "_dname_chip_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+  ggsave(file = paste0("output/multiomic/", stage, "_dname_chip_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 }
 
-g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint="Spermatid", type="cg.density")
+g <- plot_stage_dynamics(chip_dfs, dyns = chip_dyns, cols = cols_chip, timepoint = "Spermatid", type = "cg.density", plot = "violin")
 grid.arrange(g)
-ggsave(file=paste0("output/multiomic/cg_density_chip_dynamics_violin_ecdf.pdf"), g, width = 10, height = 5)
+ggsave(file = paste0("output/multiomic/cg_density_chip_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 ```
 
 ## Heatmap per H3K4me3/RNA dynamic
 ```{r message=FALSE, warning=FALSE}
-pure_labels <- c("Spermatid.promoter.dna.methyl" = "Spermatid", 
-                 "Sperm.promoter.dna.methyl"="Sperm", 
-                 "Pre.ZGA.promoter.dna.methyl"="Pre-ZGA", 
-                 "Pre.ZGA.promoter.accessibility"="Pre-ZGA", 
-                 "ZGA.expression.9hpf" = "9hpf", 
-                 "ZGA.expression.8hpf" = "8hpf", 
-                 "ZGA.expression.7hpf" = "7hpf",
-                 "ZGA.expression.6hpf" = "6hpf",
-                 "CG.density" ="",
-                 "Spermatid.peak.width" = "Spermatid",
-                 "Sperm.peak.width" = "Sperm",
-                 "Pre.ZGA.peak.width" = "Pre-ZGA",
-                 "ZGA.peak.width" = "ZGA",
-                 "Spermatid.promoter.mean" = "Spermatid",
-                 "Sperm.promoter.mean" = "Sperm",
-                 "Pre.ZGA.promoter.mean" = "Pre-ZGA",
-                 "ZGA.promoter.mean" = "ZGA",
-                 "Spermatid.expression" = "Spermatid")
+pure_labels <- c(
+  "Spermatid.promoter.dna.methyl" = "Spermatid",
+  "Sperm.promoter.dna.methyl" = "Sperm",
+  "Pre.ZGA.promoter.dna.methyl" = "Pre-ZGA",
+  "Pre.ZGA.promoter.accessibility" = "Pre-ZGA",
+  "ZGA.expression.9hpf" = "9hpf",
+  "ZGA.expression.8hpf" = "8hpf",
+  "ZGA.expression.7hpf" = "7hpf",
+  "ZGA.expression.6hpf" = "6hpf",
+  "CG.density" = "",
+  "Spermatid.peak.width" = "Spermatid",
+  "Sperm.peak.width" = "Sperm",
+  "Pre.ZGA.peak.width" = "Pre-ZGA",
+  "ZGA.peak.width" = "ZGA",
+  "Spermatid.promoter.mean" = "Spermatid",
+  "Sperm.promoter.mean" = "Sperm",
+  "Pre.ZGA.promoter.mean" = "Pre-ZGA",
+  "ZGA.promoter.mean" = "ZGA",
+  "Spermatid.expression" = "Spermatid"
+)
 
-chip_dyn_map = melt(chip_dyns)
-rownames(chip_dyn_map) <- chip_dyn_map[,1]
-label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
-col_fun = colorRamp2(seq(-2, 2), rev(COL2("RdBu", n=5)))
+chip_dyn_map <- melt(chip_dyns)
+rownames(chip_dyn_map) <- chip_dyn_map[, 1]
+label_dyn <- function(gene, dyns) {
+  for (i in 1:length(dyns)) {
+    if (any(gene %in% dyns[[i]])) {
+      return(names(dyns)[i])
+    }
+  }
+  return(NA)
+}
+col_fun <- colorRamp2(seq(-2, 2), rev(COL2("RdBu", n = 5)))
 
-intersection_list = list()
+intersection_list <- list()
 for (chip_dyn in names(chip_dyns)) {
   for (rna_dyn in names(rna_dyns)) {
     intersection_name <- paste(chip_dyn, rna_dyn, sep = " & ")
@@ -126,260 +275,275 @@ for (chip_dyn in names(chip_dyns)) {
   }
 }
 
-heatmap_data <- data.frame("Spermatid.peak.width" = chip_dfs[["Spermatid"]][,c("peak.width")],
-                           "Spermatid.promoter.mean" = chip_dfs[["Spermatid"]][,c("promoter.mean")],
-                           "Spermatid.promoter.dna.methyl" = chip_dfs[["Spermatid"]][,c("promoter.dna.methyl")],
-                           "Sperm.peak.width" = chip_dfs[["Sperm"]][,c("peak.width")],
-                           "Sperm.promoter.mean" = chip_dfs[["Sperm"]][,c("promoter.mean")],
-                           "Sperm.promoter.dna.methyl" = chip_dfs[["Sperm"]][,c("promoter.dna.methyl")],
-                           "Pre-ZGA.peak.width" = chip_dfs[["Pre-ZGA"]][,c("peak.width")],
-                           "Pre-ZGA.promoter.mean" = chip_dfs[["Pre-ZGA"]][,c("promoter.mean")],
-                           "Pre-ZGA.promoter.dna.methyl" = chip_dfs[["Pre-ZGA"]][,c("promoter.dna.methyl")],
-                           "Pre-ZGA.promoter.accessibility" = chip_dfs[["Pre-ZGA"]][,c("promoter.accessibility")],
-                           "ZGA.peak.width" = chip_dfs[["ZGA"]][,c("peak.width")],
-                           "ZGA.promoter.mean" = chip_dfs[["ZGA"]][,c("promoter.mean")],
-                           "Spermatid.expression" = chip_dfs[["Spermatid"]][,c("expression")],
-                           "ZGA.expression.6hpf" = chip_dfs[["ZGA"]][,c("expression.6hpf")],
-                           "ZGA.expression.7hpf" = chip_dfs[["ZGA"]][,c("expression.7hpf")],
-                           "ZGA.expression.8hpf" = chip_dfs[["ZGA"]][,c("expression.8hpf")],
-                           "ZGA.expression.9hpf" = chip_dfs[["ZGA"]][,c("expression.9hpf")],
-                           "CG.density" = chip_dfs[["Spermatid"]][,c("cg.density")],
-                           "RNA.group" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns),
-                           "RNA.group.timing" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns_timing),
-                           "Dynamic" = sapply(allgenes$gene_id, label_dyn, dyns = intersection_list),
-                           "Chip.group.detail" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns_detail),
-                           "Chip.group" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns))
+heatmap_data <- data.frame(
+  "Spermatid.peak.width" = chip_dfs[["Spermatid"]][, c("peak.width")],
+  "Spermatid.promoter.mean" = chip_dfs[["Spermatid"]][, c("promoter.mean")],
+  "Spermatid.promoter.dna.methyl" = chip_dfs[["Spermatid"]][, c("promoter.dna.methyl")],
+  "Sperm.peak.width" = chip_dfs[["Sperm"]][, c("peak.width")],
+  "Sperm.promoter.mean" = chip_dfs[["Sperm"]][, c("promoter.mean")],
+  "Sperm.promoter.dna.methyl" = chip_dfs[["Sperm"]][, c("promoter.dna.methyl")],
+  "Pre-ZGA.peak.width" = chip_dfs[["Pre-ZGA"]][, c("peak.width")],
+  "Pre-ZGA.promoter.mean" = chip_dfs[["Pre-ZGA"]][, c("promoter.mean")],
+  "Pre-ZGA.promoter.dna.methyl" = chip_dfs[["Pre-ZGA"]][, c("promoter.dna.methyl")],
+  "Pre-ZGA.promoter.accessibility" = chip_dfs[["Pre-ZGA"]][, c("promoter.accessibility")],
+  "ZGA.peak.width" = chip_dfs[["ZGA"]][, c("peak.width")],
+  "ZGA.promoter.mean" = chip_dfs[["ZGA"]][, c("promoter.mean")],
+  "Spermatid.expression" = chip_dfs[["Spermatid"]][, c("expression")],
+  "ZGA.expression.6hpf" = chip_dfs[["ZGA"]][, c("expression.6hpf")],
+  "ZGA.expression.7hpf" = chip_dfs[["ZGA"]][, c("expression.7hpf")],
+  "ZGA.expression.8hpf" = chip_dfs[["ZGA"]][, c("expression.8hpf")],
+  "ZGA.expression.9hpf" = chip_dfs[["ZGA"]][, c("expression.9hpf")],
+  "CG.density" = chip_dfs[["Spermatid"]][, c("cg.density")],
+  "RNA.group" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns),
+  "RNA.group.timing" = sapply(allgenes$gene_id, label_dyn, dyns = rna_dyns_timing),
+  "Dynamic" = sapply(allgenes$gene_id, label_dyn, dyns = intersection_list),
+  "Chip.group.detail" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns_detail),
+  "Chip.group" = sapply(allgenes$gene_id, label_dyn, dyns = chip_dyns)
+)
 
-#heatmap_data$RNA.group[is.na(heatmap_data$RNA.group)] <- "ND"
-#heatmap_data$RNA.group <- factor(heatmap_data$RNA.group, levels = c("GS", "GZ", "ZS", "ND"))
-clustering=FALSE
+# heatmap_data$RNA.group[is.na(heatmap_data$RNA.group)] <- "ND"
+# heatmap_data$RNA.group <- factor(heatmap_data$RNA.group, levels = c("GS", "GZ", "ZS", "ND"))
+clustering <- FALSE
 ```
 
 ## RNA dynamics heatmap
 ```{r message=FALSE, warning=FALSE}
-
-mean_data <- aggregate(. ~  RNA.group, data=heatmap_data[!colnames(heatmap_data) %in% c("Chip.group", "Dynamic", "RNA.group.timing", "Chip.group.detail")], FUN=mean)
-rownames(mean_data) <- mean_data[,"RNA.group"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
+mean_data <- aggregate(. ~ RNA.group, data = heatmap_data[!colnames(heatmap_data) %in% c("Chip.group", "Dynamic", "RNA.group.timing", "Chip.group.detail")], FUN = mean)
+rownames(mean_data) <- mean_data[, "RNA.group"]
+mean_data <- mean_data[, -1]
+scaled_data <- as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
 rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm_rna <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation","Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
+hm_rna <- Heatmap(scaled_data,
+  use_raster = TRUE,
+  name = "Mean (z-score)",
+  col = col_fun,
+  # column_title = "Datasets", row_title = "Genes",
+  show_row_dend = clustering,
+  cluster_columns = clustering,
+  show_row_names = TRUE,
+  cluster_rows = clustering,
+  row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
+  row_title_rot = 0,
 )
 draw(hm_rna)
-pdf("output/multiomic/rna_dynamics_multiomic_heatmap.pdf", width=8, height=6)
+pdf("output/multiomic/rna_dynamics_multiomic_heatmap.pdf", width = 8, height = 6)
 draw(hm_rna)
 dev.off()
 ```
 ```{r message=FALSE, warning=FALSE}
-mean_data <- aggregate(. ~  RNA.group.timing, data=heatmap_data[!colnames(heatmap_data) %in% c("Chip.group", "Dynamic", "Chip.group.detail", "RNA.group")], FUN=mean)
-rownames(mean_data) <- mean_data[,"RNA.group.timing"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
+mean_data <- aggregate(. ~ RNA.group.timing, data = heatmap_data[!colnames(heatmap_data) %in% c("Chip.group", "Dynamic", "Chip.group.detail", "RNA.group")], FUN = mean)
+rownames(mean_data) <- mean_data[, "RNA.group.timing"]
+mean_data <- mean_data[, -1]
+scaled_data <- as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
 rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm_rna <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation","Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
+hm_rna <- Heatmap(scaled_data,
+  use_raster = TRUE,
+  name = "Mean (z-score)",
+  col = col_fun,
+  # column_title = "Datasets", row_title = "Genes",
+  show_row_dend = clustering,
+  cluster_columns = clustering,
+  show_row_names = TRUE,
+  cluster_rows = clustering,
+  row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
+  row_title_rot = 0,
 )
 draw(hm_rna)
-pdf("output/multiomic/rna_dynamics_timing_multiomic_heatmap.pdf", width=8, height=6)
+pdf("output/multiomic/rna_dynamics_timing_multiomic_heatmap.pdf", width = 8, height = 6)
 draw(hm_rna)
 dev.off()
 ```
 
 ## Chip dynamics heatmap
 ```{r message=FALSE, warning=FALSE}
-mean_data <- aggregate(. ~  Chip.group, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Dynamic", "ZGA.peak.width", "Pre.ZGA.peak.width", "Spermatid.peak.width", "Sperm.peak.width", "ZGA.promoter.mean", "Pre.ZGA.promoter.mean", "Spermatid.promoter.mean", "Sperm.promoter.mean", "Chip.group.detail", "RNA.group.timing")], FUN=mean)
-rownames(mean_data) <- mean_data[,"Chip.group"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
+mean_data <- aggregate(. ~ Chip.group, data = heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Dynamic", "ZGA.peak.width", "Pre.ZGA.peak.width", "Spermatid.peak.width", "Sperm.peak.width", "ZGA.promoter.mean", "Pre.ZGA.promoter.mean", "Spermatid.promoter.mean", "Sperm.promoter.mean", "Chip.group.detail", "RNA.group.timing")], FUN = mean)
+rownames(mean_data) <- mean_data[, "Chip.group"]
+mean_data <- mean_data[, -1]
+scaled_data <- as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
 rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm_chip <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
+hm_chip <- Heatmap(scaled_data,
+  use_raster = TRUE,
+  name = "Mean (z-score)",
+  col = col_fun,
+  # column_title = "Datasets", row_title = "Genes",
+  show_row_dend = clustering,
+  cluster_columns = clustering,
+  show_row_names = TRUE,
+  cluster_rows = clustering,
+  row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
+  row_title_rot = 0,
 )
 draw(hm_chip)
-pdf("output/multiomic/chip_dynamics_multiomic_heatmap.pdf", width=8, height=6)
+pdf("output/multiomic/chip_dynamics_multiomic_heatmap.pdf", width = 8, height = 6)
 draw(hm_chip)
 dev.off()
 ```
 ```{r message=FALSE, warning=FALSE}
-mean_data <- aggregate(. ~  Chip.group.detail, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Dynamic", "ZGA.peak.width", "Pre.ZGA.peak.width", "Spermatid.peak.width", "Sperm.peak.width", "ZGA.promoter.mean", "Pre.ZGA.promoter.mean", "Spermatid.promoter.mean", "Sperm.promoter.mean", "Chip.group", "RNA.group.timing")], FUN=mean)
-rownames(mean_data) <- mean_data[,"Chip.group.detail"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
+mean_data <- aggregate(. ~ Chip.group.detail, data = heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Dynamic", "ZGA.peak.width", "Pre.ZGA.peak.width", "Spermatid.peak.width", "Sperm.peak.width", "ZGA.promoter.mean", "Pre.ZGA.promoter.mean", "Spermatid.promoter.mean", "Sperm.promoter.mean", "Chip.group", "RNA.group.timing")], FUN = mean)
+rownames(mean_data) <- mean_data[, "Chip.group.detail"]
+mean_data <- mean_data[, -1]
+scaled_data <- as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
 rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm_chip <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
+hm_chip <- Heatmap(scaled_data,
+  use_raster = TRUE,
+  name = "Mean (z-score)",
+  col = col_fun,
+  # column_title = "Datasets", row_title = "Genes",
+  show_row_dend = clustering,
+  cluster_columns = clustering,
+  show_row_names = TRUE,
+  cluster_rows = clustering,
+  row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
+  row_title_rot = 0,
 )
 draw(hm_chip)
-pdf("output/multiomic/chip_dynamics_detail_multiomic_heatmap.pdf", width=8, height=6)
+pdf("output/multiomic/chip_dynamics_detail_multiomic_heatmap.pdf", width = 8, height = 6)
 draw(hm_chip)
 dev.off()
 ```
 ```{r}
-mean_data <- aggregate(. ~ Dynamic, data=heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Chip.group", "RNA.group.timing", "Chip.group.detail")], FUN=mean)
-rownames(mean_data) <- mean_data[,"Dynamic"]
-mean_data <- mean_data[,-1]
-scaled_data = as.matrix(scale(mean_data))
+mean_data <- aggregate(. ~ Dynamic, data = heatmap_data[!colnames(heatmap_data) %in% c("RNA.group", "Chip.group", "RNA.group.timing", "Chip.group.detail")], FUN = mean)
+rownames(mean_data) <- mean_data[, "Dynamic"]
+mean_data <- mean_data[, -1]
+scaled_data <- as.matrix(scale(mean_data))
 scaled_data <- t(scaled_data)
 rownames(scaled_data) <- pure_labels[rownames(scaled_data)]
-hm <- Heatmap(scaled_data, 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = clustering,
-        cluster_columns = clustering,
-        show_row_names = TRUE,
-        cluster_rows = clustering,
-        row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation","Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
-        row_title_rot = 0,
+hm <- Heatmap(scaled_data,
+  use_raster = TRUE,
+  name = "Mean (z-score)",
+  col = col_fun,
+  # column_title = "Datasets", row_title = "Genes",
+  show_row_dend = clustering,
+  cluster_columns = clustering,
+  show_row_names = TRUE,
+  cluster_rows = clustering,
+  row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
+  row_title_rot = 0,
 )
 draw(hm)
-pdf("output/multiomic/rna_chip_intersection_dynamics_multiomic_heatmap.pdf", width=8, height=6)
+pdf("output/multiomic/rna_chip_intersection_dynamics_multiomic_heatmap.pdf", width = 8, height = 6)
 draw(hm)
 dev.off()
 ```
 
 ## Correlation plot
 ```{r fig.height=10, fig.width=10}
-cor_labels <- c("Spermatid.promoter.dna.methyl" = "Spermatid DNAme", 
-                 "Sperm.promoter.dna.methyl"="Sperm DNAme", 
-                 "Pre.ZGA.promoter.dna.methyl"="Pre-ZGA DNAme", 
-                 "Pre.ZGA.promoter.accessibility"="Pre-ZGA Accessibility", 
-                 "ZGA.expression.9hpf" = "9hpf RNA expression", 
-                 "ZGA.expression.8hpf" = "8hpf RNA expression", 
-                 "ZGA.expression.7hpf" = "7hpf RNA expression",
-                 "ZGA.expression.6hpf" = "6hpf RNA expression",
-                 "CG.density" ="CG density",
-                 "Spermatid.peak.width" = "Spermatid peak width",
-                 "Sperm.peak.width" = "Sperm peak width",
-                 "Pre.ZGA.peak.width" = "Pre-ZGA peak width",
-                 "ZGA.peak.width" = "ZGA peak width",
-                 "Spermatid.promoter.mean" = "Spermatid promoter mean",
-                 "Sperm.promoter.mean" = "Sperm promoter mean",
-                 "Pre.ZGA.promoter.mean" = "Pre-ZGA promoter mean",
-                 "ZGA.promoter.mean" = "ZGA promoter mean",
-                 "Spermatid.expression" = "Spermatid RNA expression")
+cor_labels <- c(
+  "Spermatid.promoter.dna.methyl" = "Spermatid DNAme",
+  "Sperm.promoter.dna.methyl" = "Sperm DNAme",
+  "Pre.ZGA.promoter.dna.methyl" = "Pre-ZGA DNAme",
+  "Pre.ZGA.promoter.accessibility" = "Pre-ZGA Accessibility",
+  "ZGA.expression.9hpf" = "9hpf RNA expression",
+  "ZGA.expression.8hpf" = "8hpf RNA expression",
+  "ZGA.expression.7hpf" = "7hpf RNA expression",
+  "ZGA.expression.6hpf" = "6hpf RNA expression",
+  "CG.density" = "CG density",
+  "Spermatid.peak.width" = "Spermatid peak width",
+  "Sperm.peak.width" = "Sperm peak width",
+  "Pre.ZGA.peak.width" = "Pre-ZGA peak width",
+  "ZGA.peak.width" = "ZGA peak width",
+  "Spermatid.promoter.mean" = "Spermatid promoter mean",
+  "Sperm.promoter.mean" = "Sperm promoter mean",
+  "Pre.ZGA.promoter.mean" = "Pre-ZGA promoter mean",
+  "ZGA.promoter.mean" = "ZGA promoter mean",
+  "Spermatid.expression" = "Spermatid RNA expression"
+)
 
-df <- heatmap_data[,!colnames(heatmap_data) %in% c("RNA.group", "Chip.group", "Chip.group.detail", "RNA.group.timing", "Dynamic")]
+df <- heatmap_data[, !colnames(heatmap_data) %in% c("RNA.group", "Chip.group", "Chip.group.detail", "RNA.group.timing", "Dynamic")]
 df <- na.omit(df)
 colnames(df) <- cor_labels[colnames(df)]
 
-plot_corrplot <- function(){
-  corrplot(cor(df, method="pearson"),
-         method = "color",       
-         order = "FPC",
-         col= rev(COL2('RdBu', 200)),
-         tl.col	= "black")}
+plot_corrplot <- function() {
+  corrplot(cor(df, method = "pearson"),
+    method = "color",
+    order = "FPC",
+    col = rev(COL2("RdBu", 200)),
+    tl.col = "black"
+  )
+}
 
 plot_corrplot()
-pdf('output/multiomic/corr_plot.pdf', width=10, height=12)
+pdf("output/multiomic/corr_plot.pdf", width = 10, height = 12)
 plot_corrplot()
 dev.off()
 ```
 
 ## PCA plot
 ```{r}
-only_prezga = TRUE
+only_prezga <- TRUE
 
 complete_data <- heatmap_data
-if(only_prezga){
-  pca_input <- complete_data[,colnames(complete_data) %in% c("Pre.ZGA.promoter.mean", "Pre.ZGA.peak.width", "Pre.ZGA.promoter.dna.methyl", "Pre.ZGA.promoter.accessibility")]
+if (only_prezga) {
+  pca_input <- complete_data[, colnames(complete_data) %in% c("Pre.ZGA.promoter.mean", "Pre.ZGA.peak.width", "Pre.ZGA.promoter.dna.methyl", "Pre.ZGA.promoter.accessibility")]
 } else {
-  pca_input <- complete_data[,!colnames(complete_data) %in% c("RNA.group", "Chip.group")]
+  pca_input <- complete_data[, !colnames(complete_data) %in% c("RNA.group", "Chip.group")]
 }
 df <- na.omit(pca_input)
-  
-color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"Chip.group"]
-cols = cols_chip
 
-#color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"RNA.group"]
-#cols = cols_rna
+color.groups <- complete_data[!rownames(pca_input) %in% names(na.action(df)), "Chip.group"]
+cols <- cols_chip
 
-data.pca <- princomp(scale(df), cor=TRUE)
-#summary(data.pca)
+# color.groups = complete_data[!rownames(pca_input) %in% names(na.action(df)),"RNA.group"]
+# cols = cols_rna
+
+data.pca <- princomp(scale(df), cor = TRUE)
+# summary(data.pca)
 fviz_eig(data.pca, addlabels = TRUE)
 fviz_contrib(data.pca, choice = "var", axes = 1:2)
-fviz_pca_var(data.pca, col.var = "contrib",
-            gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-            repel = TRUE)
+fviz_pca_var(data.pca,
+  col.var = "contrib",
+  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+  repel = TRUE
+)
 fviz_pca_ind(data.pca,
-             col.ind = color.groups, 
-             palette = cols,
-             label="none",
-             pointsize = 0.5,
-             addEllipses = TRUE, # Concentration ellipses
-             ellipse.type = "norm",
-             legend.title = "Dynamics")
+  col.ind = color.groups,
+  palette = cols,
+  label = "none",
+  pointsize = 0.5,
+  addEllipses = TRUE, # Concentration ellipses
+  ellipse.type = "norm",
+  legend.title = "Dynamics"
+)
 ```
 
 ## Unsupervised clustering heatmap
 ```{r fig.height=3, fig.width=9, message=FALSE, warning=FALSE}
-genes = allgenes$gene_id
-modalities = c("promoter.mean" = "H3K4me3 mean", "peak.width" = "H3K4me3 peak width", "promoter.accessibility"="Accessibility", "cg.density"="CG density", "promoter.dna.methyl"="DNA methylation")
+genes <- allgenes$gene_id
+modalities <- c("promoter.mean" = "H3K4me3", "peak.width" = "H3K4me3 peak width", "promoter.accessibility" = "Accessibility", "cg.density" = "CG density", "promoter.dna.methyl" = "DNA methylation")
 
-hm_data <- cbind(chip_dfs[["Pre-ZGA"]][,c("promoter.mean", "peak.width", "promoter.dna.methyl", "promoter.accessibility")], chip_dfs[["Spermatid"]]['cg.density'])
-#heatmap_data <- heatmap_data[sample(1:nrow(heatmap_data), 1000, replace=FALSE),]
+hm_data <- cbind(chip_dfs[["Pre-ZGA"]][, c("promoter.mean", "promoter.dna.methyl", "promoter.accessibility")], chip_dfs[["Spermatid"]]["cg.density"])
+# heatmap_data <- heatmap_data[sample(1:nrow(heatmap_data), 1000, replace=FALSE),]
 colnames(hm_data) <- modalities[colnames(hm_data)]
-scaled_data = as.matrix(scale(hm_data))
+scaled_data <- as.matrix(scale(hm_data))
 
 set.seed(12)
-kclus <- kmeans(scaled_data, 8)
-#cluster_order = c(4,5,2,6,8,7,3,1)
-cluster_order = c(8,3,7,1,2,4,6,5)
-split <- factor(cluster_order[kclus$cluster]) #levels=cluster_order)
+kclus <- kmeans(scaled_data, 6)
+cluster_order <- c(4, 3, 6, 2, 1, 5)
 
-col_fun = colorRamp2(seq(-2, 2), rev(COL2("RdBu", n=5)))
-hm1 <- Heatmap(t(scaled_data), 
-        name = "Mean (z-score)",
-        col = col_fun,
-        #column_title = "Datasets", row_title = "Genes",
-        show_row_dend = FALSE,
-        cluster_columns = FALSE,
-        show_row_names = TRUE,
-        show_column_names = FALSE,
-        #column_order = c("promoter.enrich", "peak.width", "promoter.dna.methyl", "promoter.accessibility"),
-        column_split = split,
-        cluster_row_slices = FALSE
+split <- factor(cluster_order[kclus$cluster]) # levels=cluster_order)
+
+col_fun <- colorRamp2(seq(-2, 2), rev(COL2("RdBu", n = 5)))
+hm1 <- Heatmap(t(scaled_data),
+  use_raster = TRUE,
+  name = "Mean (z-score)",
+  col = col_fun,
+  # column_title = "Datasets", row_title = "Genes",
+  show_row_dend = FALSE,
+  cluster_columns = FALSE,
+  show_row_names = TRUE,
+  row_order = c("H3K4me3 mean", "CG density", "DNA methylation", "Accessibility"),
+  show_column_names = FALSE,
+  # column_order = c("promoter.enrich", "peak.width", "promoter.dna.methyl", "promoter.accessibility"),
+  column_split = split,
+  cluster_row_slices = FALSE
 )
 
 draw(hm1)
-pdf('output/multiomic/unsupervised_clustering_heatmap.pdf', width=9, height=3)
+pdf("output/multiomic/unsupervised_clustering_heatmap.pdf", width = 12, height = 2)
 draw(hm1)
 dev.off()
 ```

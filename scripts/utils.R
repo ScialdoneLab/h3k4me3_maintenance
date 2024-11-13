@@ -1,21 +1,46 @@
-packages <- c("here", "ggplot2", "ChIPpeakAnno", "reshape2", "AnnotationDbi", "eulerr", "PerformanceAnalytics", "factoextra", "chromstaR", "BSgenome",
-"clusterProfiler", "org.Xl.eg.db", "simplifyEnrichment", "gridExtra", "grid", "plyr", "ggalluvial", "tidyr", "scales", "corrplot", "RColorBrewer", "ComplexUpset",
-"dplyr", "ggpubr", "Biostrings", "EnrichedHeatmap", "rtracklayer", "SummarizedExperiment", "Seurat", "circlize", "ComplexHeatmap", "reshape2")
+packages <- c(
+  "here", "ggplot2", "ChIPpeakAnno", "reshape2", "AnnotationDbi", "eulerr", "PerformanceAnalytics", "factoextra", "chromstaR", "BSgenome",
+  "clusterProfiler", "org.Xl.eg.db", "simplifyEnrichment", "gridExtra", "grid", "plyr", "ggalluvial", "tidyr", "scales", "corrplot", "RColorBrewer", "ComplexUpset",
+  "dplyr", "ggpubr", "Biostrings", "EnrichedHeatmap", "rtracklayer", "SummarizedExperiment", "Seurat", "circlize", "ComplexHeatmap", "reshape2"
+)
 lapply(packages, require, character.only = TRUE)
 
 stages <- list("Spermatid", "Sperm", "Pre-ZGA", "ZGA")
 
+compute_peak_combinations <- function(dfs) {
+  stages <- names(dfs)
+  combinations <- list()
+
+  # Generate all binary combinations for the given stages
+  for (i in 0:(2^length(stages) - 1)) {
+    binary_vector <- as.integer(intToBits(i)[1:length(stages)])
+    combination_name <- paste(ifelse(binary_vector == 1, "Y", "N"), collapse = "_")
+
+    # Construct the logical condition for the current combination
+    condition <- apply(mapply(function(stage, bit) {
+      if (bit == 1) {
+        dfs[[stage]]$peak
+      } else {
+        !dfs[[stage]]$peak
+      }
+    }, stages, binary_vector), 1, all)
+    # Store the genes matching the current combination
+    combinations[[combination_name]] <- allgenes$gene_id[condition]
+  }
+  return(combinations)
+}
+
 go_enrichment <- function(data) {
   Xl_ENTREZ <- read.delim("data/raw/genome/GenePageLaevisEntrezGeneUnigeneMapping.txt", header = FALSE)
-  entrez <- Xl_ENTREZ[Xl_ENTREZ$V2 %in% data, ] 
+  entrez <- Xl_ENTREZ[Xl_ENTREZ$V2 %in% data, ]
   colnames(entrez) <- c("Xenbase ID", "Gene symbol", "Entrez ID", "Xl ID unknown")
   GO <- enrichGO(entrez$`Entrez ID`, OrgDb = org.Xl.eg.db, ont = "BP", readable = TRUE)
   return(GO)
 }
-plot_go <- function(enrichGO, name){
+plot_go <- function(enrichGO, name) {
   dp <- dotplot(enrichGO)
   cn <- cnetplot(enrichGO)
-  grid.arrange(dp, cn, top=name, nrow=2)
+  grid.arrange(dp, cn, top = name, nrow = 2)
 }
 
 readGranges <- function(filename) {
@@ -27,145 +52,350 @@ readGranges <- function(filename) {
   granges_chr <- granges[seqnames(granges) %in% chr]
 }
 
-enrichment <- function(coverage, title, mode="ranges", value_name="H3K4me3 enrichment", enriched_score=FALSE){
-  if(mode=="ranges"){
+enrichment <- function(coverage, title, mode = "ranges", value_name = "H3K4me3 enrichment", enriched_score = FALSE) {
+  if (mode == "ranges") {
     coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
-  } else if(mode=="coverage"){
+  } else if (mode == "coverage") {
     coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage", value_column = "score")
   }
-  coverage <- log2(coverage+1)
-  hm <- EnrichedHeatmap(coverage, 
-                        name = value_name,
-                        column_title = title,
-                        col = c("blue", "red"),
-                        axis_name = c("-1kb", "TSS", "+1kb"))
+  coverage <- log2(coverage + 1)
+  hm <- EnrichedHeatmap(coverage,
+    use_raster = TRUE,
+    name = value_name,
+    column_title = title,
+    col = c("blue", "red"),
+    axis_name = c("-1kb", "TSS", "+1kb")
+  )
   draw(hm)
-  if(enriched_score){
+  if (enriched_score) {
     return(enriched_score(coverage))
-  }else{
+  } else {
 
   }
   return(coverage)
 }
 
-label_dyn <- function(gene, dyns){for(i in 1:length(dyns)){if(any(gene %in% dyns[[i]])){return(names(dyns)[i])}}; return(NA)}
-plot_peak <- function(stage, dyns, cols, onlypeaks=FALSE, remove_NA=TRUE){
-  stage_raw <- data.frame(chip_norm_mats[[paste(stage)]])
-  if(onlypeaks){stage_raw <- stage_raw[chip_dfs[[paste(stage)]]$peak, ]}
+label_dyn <- function(gene, dyns) {
+  for (i in 1:length(dyns)) {
+    if (any(gene %in% dyns[[i]])) {
+      return(names(dyns)[i])
+    }
+  }
+  return(NA)
+}
+plot_peak <- function(data, stage, dyns, cols, onlypeaks = FALSE, remove_NA = TRUE, label = "") {
+  stage_raw <- data.frame(data[[paste(stage)]])
+  if (onlypeaks) {
+    stage_raw <- stage_raw[chip_dfs[[paste(stage)]]$peak, ]
+  }
   stage_raw$dyn <- sapply(rownames(stage_raw), label_dyn, dyns = dyns)
   stage_raw$gene <- rownames(stage_raw)
-  if(remove_NA){stage_raw <- stage_raw[!is.na(stage_raw$dyn),]}
+  if (remove_NA) {
+    stage_raw <- stage_raw[!is.na(stage_raw$dyn), ]
+  }
   melted <- melt(stage_raw)
   colnames(melted) <- c("dynamics", "Gene", "Genomic location", "Coverage")
-  plot <- ggline(melted, x = "Genomic location", y = "Coverage",
-   add = "mean_se", conf.int = TRUE, color="dynamics") + scale_color_manual(values=cols) + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + labs(y=expression(atop(Mean~H3K4me3~ChIP-Seq~intensity,log[2](Coverage + 1))), x = "+/-1kb of TSS") + ggtitle(stage) + guides(color = "none")
+  plot <- ggline(melted,
+    x = "Genomic location", y = "Coverage",
+    add = "mean_se", conf.int = TRUE, color = "dynamics"
+  ) + scale_color_manual(values = cols) + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + ggtitle(stage) + guides(color = "none")
+  if (label == "DNAme") {
+    plot <- plot + labs(y = expression(atop(Mean ~ DNAme ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+  } else if (label == "H3K4me3") {
+    plot <- plot + labs(y = expression(atop(Mean ~ H3K4me3 ~ ChIP - Seq ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+  } else if (label == "DamID") {
+    plot <- plot + labs(y = expression(atop(Mean ~ DamID ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+  } else {
+    plot <- plot + labs(y = expression(atop(Mean ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+  }
 }
 
-plot_stage_dynamics <- function(data, dyns, cols, timepoint, type, onlypeaks=FALSE, legend=FALSE, remove_NA=TRUE, grouped=FALSE, levels=NULL, only_violin=FALSE){
+plot_stage_dynamics <- function(data, dyns, cols, timepoint, type, onlypeaks = FALSE, legend = FALSE, remove_NA = TRUE, grouped = FALSE, levels = NULL, plot = "violin", add_signif = TRUE) {
   plot_df <- data[[timepoint]]
-  if(onlypeaks){plot_df <- plot_df[plot_df$peak, ]}
+  if (onlypeaks) {
+    plot_df <- plot_df[plot_df$peak, ]
+  }
   plot_df$genes <- rownames(plot_df)
-  
+
   plot_df$dyn <- factor(sapply(plot_df$genes, label_dyn, dyns = dyns))
-  if(remove_NA){plot_df <- plot_df[!is.na(plot_df$dyn),]}
-  #plot_df <- na.omit(plot_df)
-  
-  if(!is.null(levels)){
-    plot_df <- plot_df[as.vector(plot_df$dyn) %in% levels,]
+  if (remove_NA) {
+    plot_df <- plot_df[!is.na(plot_df$dyn), ]
+  }
+  # plot_df <- na.omit(plot_df)
+
+  if (!is.null(levels)) {
+    plot_df <- plot_df[as.vector(plot_df$dyn) %in% levels, ]
     plot_df$dyn <- factor(plot_df$dyn)
   }
-  if(grouped){
+  if (grouped) {
     plot_df$dyn_group <- factor(sapply(plot_df$genes, label_dyn, dyns = chip_dyns))
-    cluster_order <- levels(reorder(plot_df$dyn_group, plot_df[,paste(type)], median, decreasing=TRUE))
-    pos <- seq(1, length(cluster_order)*2, 2)
-    get_sub_order <- function(cluster){
-      sub_order <-  levels(droplevels(reorder(plot_df[plot_df$dyn_group==cluster, "dyn"], 
-                                   plot_df[plot_df$dyn_group == cluster,paste(type)], 
-                                   median, decreasing=TRUE)))
+    cluster_order <- levels(reorder(plot_df$dyn_group, plot_df[, paste(type)], median, decreasing = TRUE))
+    pos <- seq(1, length(cluster_order) * 2, 2)
+    get_sub_order <- function(cluster) {
+      sub_order <- levels(droplevels(reorder(plot_df[plot_df$dyn_group == cluster, "dyn"],
+        plot_df[plot_df$dyn_group == cluster, paste(type)],
+        median,
+        decreasing = TRUE
+      )))
     }
-    for(dyn_group in levels(plot_df$dyn_group)){
-      sub_order = get_sub_order(dyn_group)
-      dyn_group_idx = which(cluster_order == dyn_group)
-      if(length(sub_order) > 0){
-        if(dyn_group_idx < length(pos)){
-          pos[(dyn_group_idx+1):length(pos)] <- pos[(dyn_group_idx+1):length(pos)] + length(sub_order) - 1
+    for (dyn_group in levels(plot_df$dyn_group)) {
+      sub_order <- get_sub_order(dyn_group)
+      dyn_group_idx <- which(cluster_order == dyn_group)
+      if (length(sub_order) > 0) {
+        if (dyn_group_idx < length(pos)) {
+          pos[(dyn_group_idx + 1):length(pos)] <- pos[(dyn_group_idx + 1):length(pos)] + length(sub_order) - 1
         }
-        pos <- append(pos, seq(pos[dyn_group_idx], pos[dyn_group_idx]+length(sub_order)-1, 1), after=dyn_group_idx) 
-      }
-      else {
-        pos[(dyn_group_idx+1):length(pos)] <- pos[(dyn_group_idx+1):length(pos)] -2
+        pos <- append(pos, seq(pos[dyn_group_idx], pos[dyn_group_idx] + length(sub_order) - 1, 1), after = dyn_group_idx)
+      } else {
+        pos[(dyn_group_idx + 1):length(pos)] <- pos[(dyn_group_idx + 1):length(pos)] - 2
       }
       pos <- pos[-dyn_group_idx]
-      cluster_order <- append(cluster_order, sub_order, after=dyn_group_idx)
+      cluster_order <- append(cluster_order, sub_order, after = dyn_group_idx)
       cluster_order <- cluster_order[-dyn_group_idx]
     }
     plot_df$dyn <- factor(pos[as.numeric(factor(plot_df$dyn, levels = cluster_order))], levels = seq(1, max(pos)))
-    cols = setNames(cols[cluster_order], pos)
+    cols <- setNames(cols[cluster_order], pos)
+  } else {
+    plot_df$dyn <- factor(plot_df$dyn, levels = levels(reorder(plot_df$dyn, plot_df[, paste(type)], median, decreasing = TRUE)))
   }
-  else {
-    plot_df$dyn <- factor(plot_df$dyn, levels = levels(reorder(plot_df$dyn, plot_df[,paste(type)], median, decreasing=TRUE)))
+
+  if (plot == "violin") {
+    boxplot_fill <- ifelse(type == "peak.width", "dyn", "white")
+    violin_plot <- ggviolin(plot_df, x = "dyn", y = type, fill = "dyn", add = "boxplot", add.params = list(fill = boxplot_fill), linetype = "solid", size = 0.01) +
+      scale_fill_manual(values = cols) +
+      rotate_x_text(angle = 45) +
+      guides(fill = "none") +
+      ylab(axis_titles[[type]]) +
+      theme(axis.title.x = element_blank())
+    if (add_signif) {
+      comp_group <- c("Kept", "Expressed@6hpf", "GZ")
+      x_comps <- setdiff(levels(plot_df$dyn), comp_group)
+      x_comp <- intersect(levels(plot_df$dyn), comp_group)
+      if (type == "promoter.dna.methyl") {
+        x_comps <- rev(x_comps)
+      }
+      comparisons <- list(c(x_comp, x_comps[1]), c(x_comp, x_comps[2]))
+
+      violin_plot <- violin_plot + stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif")
+    }
+    if (grouped) {
+      violin_plot <- violin_plot + scale_x_discrete(breaks = pos, labels = cluster_order, drop = FALSE)
+    }
+    if (legend) {
+      violin_plot <- violin_plot + guides(fill = guide_legend(nrow = 2))
+    }
+    plot <- violin_plot
+  } else if (plot == "ecdf") {
+    ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values = cols) + guides(color = "none") + xlab(paste(axis_titles[[type]])) + ylab(paste0("F(", axis_titles[[type]], ")"))
+    if (legend) {
+      ecdf_plot <- ecdf_plot + guides(color = guide_legend(nrow = 2))
+    }
+    plot <- ecdf_plot
   }
-  
-  violin_plot <- ggviolin(plot_df, x = "dyn", y = paste(type), fill = "dyn",
-           add = "boxplot", add.params = list(fill = "white")) + scale_fill_manual(values=cols) + rotate_x_text(45) + guides(fill="none") + ylab(paste(axis_titles[[type]])) + theme(axis.title.x=element_blank())
-  if(grouped){violin_plot <- violin_plot + scale_x_discrete(breaks = pos, labels=cluster_order, drop=FALSE)}
-  if(only_violin){return(violin_plot)}
-  ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values=cols) + guides(color = "none") + xlab(paste(axis_titles[[type]]))
-  if(legend){
-    violin_plot <- violin_plot + guides(fill = guide_legend(nrow = 2))
-    ecdf_plot <- ecdf_plot + guides(color = guide_legend(nrow = 2))
+  if (type == "cg.density") {
+    title <- ""
+  } else {
+    title <- paste(timepoint)
   }
-  if(type=="cg.density"){title<-""}else{title <- paste(timepoint)}
-  arrangeGrob(violin_plot, ecdf_plot, top=title, ncol=2) #grid.arrange for direct plotting
+  return(plot)
 }
 
-plot_balloonplot <- function(x_dyns, y_dyns, limit=50, sort_similar=FALSE, remove_empty=FALSE, remove_dyns=c(), x_caption="", y_caption=""){
-  
-  genesAbsolute <- lapply(y_dyns, function(y){as.data.frame(lapply(x_dyns, function(x){length(intersect(y, x))}))})
+plot_balloonplot <- function(x_dyns, y_dyns, limit = 50, sort_similar = FALSE, remove_empty = FALSE, remove_dyns = c(), x_caption = "", y_caption = "") {
+  genesAbsolute <- lapply(y_dyns, function(y) {
+    as.data.frame(lapply(x_dyns, function(x) {
+      length(intersect(y, x))
+    }))
+  })
   genesAbsolute <- do.call(rbind, genesAbsolute)
-  
-  fisher_p <- function(row, column){
-    mat = genesAbsolute
-    fisher_mat <- matrix(c(mat[row, column], sum(mat[-row, column]), sum(mat[row, -column]), sum(mat[-row, -column])), nrow=2)
+
+  fisher_p <- function(row, column) {
+    mat <- genesAbsolute
+    fisher_mat <- matrix(c(mat[row, column], sum(mat[-row, column]), sum(mat[row, -column]), sum(mat[-row, -column])), nrow = 2)
     p_val <- fisher.test(fisher_mat)$p.value
     return(max(p_val, 10^(-limit)))
   }
-  
-  p_mat = data.frame(matrix(NA, nrow = nrow(genesAbsolute), ncol = ncol(genesAbsolute)), row.names = rownames(genesAbsolute))
-  colnames(p_mat) = colnames(genesAbsolute)
-  
-  for (row in 1:nrow(p_mat)){
-    for (col in 1:ncol(p_mat)){
+
+  p_mat <- data.frame(matrix(NA, nrow = nrow(genesAbsolute), ncol = ncol(genesAbsolute)), row.names = rownames(genesAbsolute))
+  colnames(p_mat) <- colnames(genesAbsolute)
+
+  for (row in 1:nrow(p_mat)) {
+    for (col in 1:ncol(p_mat)) {
       p_mat[row, col] <- fisher_p(row, col)
     }
   }
-  
-  p_mat <- matrix(p.adjust(as.matrix(p_mat), method = "fdr"), ncol=ncol(p_mat), dimnames=list(rownames(p_mat), colnames(p_mat)))
-  p_mat = -log10(p_mat)
+
+  p_mat <- matrix(p.adjust(as.matrix(p_mat), method = "fdr"), ncol = ncol(p_mat), dimnames = list(rownames(p_mat), colnames(p_mat)))
+  p_mat <- -log10(p_mat)
   p_mat[genesAbsolute == 0] <- NA
-  
-  if(sort_similar){
+
+  if (sort_similar) {
     p_mat[p_mat < (-log10(0.05))] <- 0
-    y_dist<-dist(p_mat, method="euclidean")
-    y_clust<-hclust(y_dist, method='complete')
-  
-    x_dist<-dist(t(p_mat), method="euclidean")
-    x_clust<-hclust(x_dist, method='complete')
+    y_dist <- dist(p_mat, method = "euclidean")
+    y_clust <- hclust(y_dist, method = "complete")
+
+    x_dist <- dist(t(p_mat), method = "euclidean")
+    x_clust <- hclust(x_dist, method = "complete")
 
     p_mat <- p_mat[y_clust$order, x_clust$order]
   }
-  
+
   p_mat[p_mat < (-log10(1e-2))] <- NA
 
-  if(remove_empty){
-    p_mat <- p_mat[rowSums(is.na(p_mat)) != ncol(p_mat), ] 
+  if (remove_empty) {
+    p_mat <- p_mat[rowSums(is.na(p_mat)) != ncol(p_mat), ]
   }
   p_mat <- p_mat[!rownames(p_mat) %in% remove_dyns, !colnames(p_mat) %in% remove_dyns]
-  
+
   my_cols <- rev(c("#DC267F", "#FE6100", "#FFB000", "#FFFFFF"))
-  ggballoonplot(p_mat, fill="value") +
-                        theme_light() + labs(x="", y="") + labs(x=x_caption, y=y_caption) + rotate_x_text(45) +
-                        scale_fill_gradientn(colors = my_cols, limits=c(0,limit), values=c(0, 0.6, 0.7, 1), breaks=c(2, 10, 25, 35, limit), labels = c(1e-2, 1e-10, 1e-25, 1e-35, 10^(-limit))) + guides(size=guide_legend(title="adjusted p value"), fill=guide_legend(title="adjusted p value")) + scale_size(range = c(0, 10), limits=c(0, limit), breaks =c(2, 10, 25, 35, limit), labels = c(1e-2, 1e-10, 1e-25, 1e-35, 10^(-limit)))
+  ggballoonplot(p_mat, fill = "value") +
+    theme_light() + labs(x = "", y = "") + labs(x = x_caption, y = y_caption) + rotate_x_text(45) +
+    scale_fill_gradientn(colors = my_cols, limits = c(0, limit), values = c(0, 0.6, 0.7, 1), breaks = c(2, 10, 25, 35, limit), labels = c(1e-2, 1e-10, 1e-25, 1e-35, 10^(-limit))) + guides(size = guide_legend(title = "adjusted p value"), fill = guide_legend(title = "adjusted p value")) + scale_size(range = c(0, 10), limits = c(0, limit), breaks = c(2, 10, 25, 35, limit), labels = c(1e-2, 1e-10, 1e-25, 1e-35, 10^(-limit)))
+}
+
+plot_combined <- function(rep, control, zygotic_only, plot = "heatmap", dynamic = NULL, tp = NULL, experiment_type = "auxin") {
+    # Load and preprocess data
+    se <- preprocess_data(rep, zygotic_only, experiment_type)
+    tpms_norm <- normalize_tpms(se, control, experiment_type)
+    
+    if (plot == "violin") {
+        plot_violin(tpms_norm, rep, tp, dynamic, experiment_type)
+    } else {
+        plot_heatmap(tpms_norm, rep, experiment_type)
+    }
+}
+
+preprocess_data <- function(rep, zygotic_only, experiment_type) {
+    if (zygotic_only) {
+        se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
+    }
+    
+    if (experiment_type == "auxin") {
+        se <- se[, se@colData@listData$experiment_set == rep]
+        se <- se[, !grepl("Wt", se@colData@listData$condition)]
+    } else if (experiment_type == "morpholino") {
+        se <- se[, sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep]
+        se <- se[, !grepl("Wdr5", se@colData@listData$group)]
+        se <- se[, !grepl("256c Rep", se@colData@listData$group)]
+    }
+    
+    return(se)
+}
+
+normalize_tpms <- function(se, control, experiment_type) {
+    tpms <- se@assays@data@listData$tpms
+    tpms <- tpms[!(mapnames[rownames(tpms)] %in% names(table(mapnames)[table(mapnames) > 1])), ]
+    tpms <- tpms[complete.cases(tpms), ]
+    
+    if (experiment_type == "auxin") {
+        timepoints <- se@colData@listData$time_point
+        conditions <- se@colData@listData$condition
+    } else {
+        groups <- se@colData@listData$group
+        timepoints <- sapply(groups, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])
+        conditions <- sapply(groups, function(x) sub(" 256c(.*)", "", x))
+    }
+    
+    tpms_ctrl_normalize <- function(idx) {
+        if (experiment_type == "auxin") {
+            timepoint <- timepoints[idx]
+            mean_ctrl <- rowMeans(tpms[, timepoints == timepoint & conditions == control[conditions[idx]]])
+        } else {
+            group <- groups[idx]
+            timepoint <- regmatches(group, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", group))[1]
+            mean_ctrl <- rowMeans(tpms[, timepoints == timepoint & conditions == control])
+        }
+        return((tpms[, idx] + 1) / (mean_ctrl + 1))
+    }
+    
+    tpms_norm <- as.data.frame(sapply(1:ncol(tpms), tpms_ctrl_normalize))
+    rownames(tpms_norm) <- mapnames[rownames(tpms_norm)]
+    colnames(tpms_norm) <- groups
+    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+    
+    return(tpms_norm)
+}
+
+plot_violin <- function(tpms_norm, rep, tp, dynamic, experiment_type) {
+    if (experiment_type == "auxin") {
+        tpms_norm <- tpms_norm[, se@colData@listData$experiment_set == rep & se@colData@listData$time_point == names(table(se@colData@listData$time_point))[tp] & !(se@colData@listData$condition %in% c("Wt-IAA", "Wt -IAA"))]
+        tpms_norm$condition <- sub("\\.[123]", "", colnames(tpms_norm))
+        scale_fill_values <- c("#7BC5CD", "#54868B", "#CE5C46", "#8C3F30")
+        comparisons <- list(c("Control -IAA", "Control +IAA"), c("Treated -IAA", "Control -IAA"), c("Treated +IAA", "Control +IAA"))
+        label_y <- c(1.9, 2.1, 2.3)
+    } else {
+        tpms_norm <- tpms_norm[, sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep & sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1]) == names(table(sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])))[tp]]
+        tpms_norm$condition <- sub("..$", "", colnames(tpms_norm))
+        scale_fill_values <- c("#E1DCC9", "#17395C", "#EFB758")
+        comparisons <- list(c("Kmt2b MO", "Ctrl MO"), c("Cxxc1 MO", "Ctrl MO"))
+        label_y <- c(2.4, 2.7)
+    }
+    
+    tpms_norm$genes <- rownames(tpms_norm)
+    tpms_norm <- melt(tpms_norm, variable.name = "condition", value.name = "value", na.rm = TRUE)
+    tpms_norm$dyn <- sapply(tpms_norm$genes, label_dyn, dyns = chip_dyns)
+    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+    
+    ggviolin(tpms_norm, x = "condition", y = "value", fill = "condition", add = "boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) +
+        labs(y = "relative tpms +1", x = NULL, title = paste(dynamic, "& Zygotic (", names(table(se@colData@listData$time_point))[tp], ")")) +
+        theme_pubr() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+        scale_x_discrete(limits = c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA"), labels = function(x) sub("(IAA).*", "\\1", x)) +
+        scale_fill_manual(values = setNames(scale_fill_values, c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA"))) +
+        stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"), label.y = label_y) +
+        geom_hline(yintercept = 1, linetype = "dotted") +
+        coord_cartesian(ylim = c(0, 2.5))
+}
+
+plot_heatmap <- function(tpms_norm, rep, experiment_type) {
+    if (experiment_type == "auxin") {
+        timepoints_rep12 <- c("T1" = "T1 256c + 1hr", "T2" = "T2 256c + 2hr", "T3" = "T3 256c + 3hr")
+        timepoints_str <- names(table(se@colData@listData$time_point))
+        if (rep %in% c(1, 2)) {
+            timepoints_str <- timepoints_rep12[timepoints_str]
+            conditions_order <- c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA")
+        } else {
+            conditions_order <- c("Control-IAA", "Control+IAA", "Treated-IAA", "Treated+IAA")
+        }
+    } else {
+        conditions_order <- c("NI Ctrl", "Ctrl MO", "Cxxc1 MO", "Kmt2b MO")
+        timepoints_str <- names(table(sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])))
+    }
+    
+    column_order <- expand.grid(tech_rep = c(1, 2, 3), timepoint = timepoints_str, condition = conditions_order)
+    str_column_order <- paste(column_order$condition, paste0(rep, ".", column_order$tech_rep), column_order$timepoint)
+    
+    tpms_norm <- tpms_norm[, str_column_order]
+    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+    
+    col_fun <- colorRamp2(c(0, 1, 2), c("blue", "white", "red"))
+    hm <- Heatmap(tpms_norm,
+                  use_raster = TRUE,
+                  col = col_fun,
+                  name = "relative tpms+1",
+                  column_split = column_order$condition,
+                  cluster_columns = FALSE,
+                  cluster_column_slices = FALSE,
+                  cluster_row_slices = FALSE,
+                  row_split = factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = chip_dyns), "& Zygotic"), levels = c("Gained & Zygotic", "Kept & Zygotic")),
+                  show_row_names = FALSE,
+                  show_row_dend = FALSE,
+                  row_title_rot = 0)
+    
+    tpms_norm$rna_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = rna_dyns)
+    hm_rna <- Heatmap(tpms_norm$rna_dyn,
+                      use_raster = TRUE,
+                      name = "RNA dynamic",
+                      col = cols_rna)
+    
+    tpms_norm$de_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = de_list)
+    tpms_norm$de_dyn[is.na(tpms_norm$de_dyn)] <- "no change"
+    hm_de <- Heatmap(tpms_norm$de_dyn,
+                     use_raster = TRUE,
+                     name = "Differential expression",
+                     col = c("down" = "#2A2D7C", "up" = "#CD2027", "no change" = "#BFBEBE"))
+    
+    hm <- hm + hm_de + hm_rna
+    draw(hm)
 }
 
 assignChromosomeRegion <- function(peaks.RD, exon, TSS, utr5, utr3, proximal.promoter.cutoff = c(

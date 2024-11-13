@@ -24,7 +24,6 @@ gg_color_hue <- function(n) {
 }
 
 Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
-names(h3k4stages) <- c("Spermatid", "Sperm", "Pre-ZGA", "ZGA")
 genodis <- lapply(h3k4stages, function(x) {
   assignChromosomeRegion(x,
     nucleotideLevel = FALSE, proximal.promoter.cutoff = c(upstream = 1000, downstream = 1000), precedence = c("Promoters", "immediateDownstream", "fiveUTRs", "threeUTRs", "Exons", "Introns"),
@@ -44,7 +43,7 @@ ggplot(ggdf1, aes(fill = Var1, y = value, x = Var2)) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), axis.title.x = element_blank(), legend.title = element_blank()) +
   ggtitle("H3K4me3 peaks") +
   scale_fill_manual(values = c("grey", gg_color_hue(6)))
-ggsave('output/chip/genomic_distribution.pdf', width=5, height=5)
+ggsave('output/chip/genomic_distribution.pdf', width=3.3, height=3)
 
 rm(Xenla10.1_TxDb)
 ```
@@ -62,24 +61,10 @@ chip_groups_complete <- setNames(as.list(chip_names_complete), chip_names_comple
 
 ```{r}
 #Definition of dynamic groups
-genes <- allgenes$gene_id
-N_Y_Y_Y = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-1-1
-N_Y_Y_N = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-1-0
-N_Y_N_Y = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-1-0-1
-N_Y_N_N = genes[!chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-1-0-0
-N_N_Y_Y = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-1-1
-N_N_Y_N = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-1-0
-N_N_N_Y = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #0-0-0-1
-N_N_N_N = genes[!chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #0-0-0-0
-
-Y_Y_Y_Y = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-1-1
-Y_Y_Y_N = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-1-0
-Y_Y_N_Y = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-1-0-1
-Y_Y_N_N = genes[chip_dfs[["Spermatid"]]$peak & chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-1-0-0
-Y_N_Y_Y = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-1-1
-Y_N_Y_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-1-0
-Y_N_N_Y = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & chip_dfs[["ZGA"]]$peak] #1-0-0-1
-Y_N_N_N = genes[chip_dfs[["Spermatid"]]$peak & !chip_dfs[["Sperm"]]$peak & !chip_dfs[["Pre-ZGA"]]$peak & !chip_dfs[["ZGA"]]$peak] #1-0-0-0
+peak_combinations <- compute_peak_combinations(chip_dfs)
+for (combination_name in names(peak_combinations)) {
+  assign(combination_name, peak_combinations[[combination_name]])
+}
 
 get_dyns <- function(cluster){
     lists = as.vector(unlist(sapply(cluster, function(dyn_name){get(dyn_name)}, simplify = TRUE), use.names = FALSE))}
@@ -107,22 +92,26 @@ if (tolower(response) == "yes") {
 
 ## Plot legend
 ```{r fig.height=3, fig.width=10}
-dyns = chip_dyns_detail
-remove_NNNN <- FALSE
-
-groups <- names(dyns)
-if(remove_NNNN){groups <- groups[!groups %in% c("N_N_N_N", "Absent")]}
-
 #groups <- groups[!groups %in% c("Kept")]
 
 pdf(file="output/chip/chip_dynamics_legend.pdf", width=10, height=10)
 plot.new()
 #plot(NULL, ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
-legend("center", legend=groups, title="H3K4me3", bty = "y", fill=cols_chip_detail[groups], ncol = 1)
+legend("center", legend=names(chip_dyns), title="H3K4me3", bty = "y", fill=cols_chip[names(chip_dyns)], ncol = 1)
 dev.off()
 
 plot.new()
-legend("center", legend=groups, title="H3K4me3", bty = "y", fill=cols_chip_detail[groups], ncol = 1)
+legend("center", legend=names(chip_dyns), title="H3K4me3", bty = "y", fill=cols_chip[names(chip_dyns)], ncol = 1)
+
+
+pdf(file="output/chip/chip_dynamics_detail_legend.pdf", width=10, height=10)
+plot.new()
+#plot(NULL, ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("center", legend=names(chip_dyns_detail), title="H3K4me3", bty = "y", fill=cols_chip_detail[names(chip_dyns_detail)], ncol = 1)
+dev.off()
+
+plot.new()
+legend("center", legend=names(chip_dyns_detail), title="H3K4me3", bty = "y", fill=cols_chip_detail[names(chip_dyns_detail)], ncol = 1)
 ```
 
 ## Venn diagram of H3K4me3 dynamics
@@ -240,20 +229,35 @@ for(stage in stages){
 ## Violin plots
 ```{r}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.mean", only_violin = TRUE)
+  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.mean", plot = "violin")
   grid.arrange(g)
   ggsave(file=paste0("output/chip/", stage, "_violin_plot.pdf"), g, width = 5, height = 4)
+
+  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.mean", plot = "ecdf")
+  grid.arrange(g)
+  ggsave(file=paste0("output/chip/", stage, "_ecdf_plot.pdf"), g, width = 5, height = 4)
+}
+```
+```{r}
+for(stage in stages){
+  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="peak.width", plot = "violin")
+  grid.arrange(g)
+  ggsave(file=paste0("output/chip/", stage, "_width_violin_plot.pdf"), g, width = 5, height = 4)
+
+  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="peak.width", plot = "ecdf")
+  grid.arrange(g)
+  ggsave(file=paste0("output/chip/", stage, "_width_ecdf_plot.pdf"), g, width = 5, height = 4)
 }
 ```
 ```{r}
 dyns = c(chip_dyns_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")], chip_dyns["Recovered"])
 cols = c(cols_chip_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")], cols_chip["Recovered"])
 
-g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="promoter.mean", only_violin = TRUE)
+g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="promoter.mean", plot="violin")
 grid.arrange(g)
 ggsave(file=paste0("output/chip/Spermatid_violin_plot_detail.pdf"), g, width = 5, height = 4)
 
-g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="peak.width", only_violin = TRUE)
+g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="peak.width", plot = "violin")
 grid.arrange(g)
 ggsave(file=paste0("output/chip/Spermatid_violin_plot_width_detail.pdf"), g, width = 5, height = 4)
 ```
@@ -261,11 +265,11 @@ ggsave(file=paste0("output/chip/Spermatid_violin_plot_width_detail.pdf"), g, wid
 dyns = c(chip_dyns_detail[c("Kept", "GainedEarly", "GainedLate")], chip_dyns["Recovered"])
 cols = c(cols_chip_detail[c("Kept", "GainedEarly", "GainedLate")], cols_chip["Recovered"])
 
-g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="promoter.mean", only_violin = TRUE)
+g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="promoter.mean", plot = "violin")
 grid.arrange(g)
 ggsave(file=paste0("output/chip/ZGA_violin_plot_detail.pdf"), g, width = 5, height = 4)
 
-g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="peak.width", only_violin = TRUE)
+g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="peak.width", plot = "violin")
 grid.arrange(g)
 ggsave(file=paste0("output/chip/ZGA_violin_plot_width_detail.pdf"), g, width = 5, height = 4)
 ```
@@ -276,7 +280,7 @@ dyns = chip_dyns_removed
 for (i in 1:length(dyns)){
   chip_GO <- go_enrichment(dyns[[i]])
   if(sum(chip_GO@result$p.adjust < chip_GO@pvalueCutoff)){
-    pdf(file=paste0("output/chip/GO_", names(dyns)[i], ".pdf"), width=8, height=12)
+    pdf(file=paste0("output/chip/GO_", names(dyns)[i], ".pdf"), width=5, height=10)
     plot_go(chip_GO, names(dyns)[i])
     dev.off()
     plot_go(chip_GO, names(dyns)[i])
@@ -300,7 +304,7 @@ go_list <- lapply(go_dyns, go_enrichment)
 go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
 go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
 
-pdf(file=paste0("output/chip/GO_summary_chip_dynamics.pdf"), width=10, height=6)
+pdf(file=paste0("output/chip/GO_summary_chip_dynamics.pdf"), width=8, height=6)
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
 dev.off()
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
@@ -316,7 +320,7 @@ transition_diff <- function(transition, type){
   plot_df <- data.frame(allgenes$gene_id[genes_prev], factor(genes_maintain[genes_prev], levels=c("FALSE","TRUE"),labels=c("Not maintained", "Maintained")),
                                                                                     chip_dfs[[prev_stage]][genes_prev, type])
   colnames(plot_df) <- c("Gene", "H3K4me3", type)
-  violin_plot <- ggviolin(plot_df, x = "H3K4me3", y = paste(type), fill = "H3K4me3",
+  violin_plot <- ggviolin(plot_df, x = "H3K4me3", y = paste(type), fill = "H3K4me3", linetype = "solid", size = 0.01,
          add = "boxplot", add.params = list(fill = "white")) + stat_compare_means(comparisons = list( c("Maintained", "Not maintained")),method = "wilcox.test", label = "p.signif") + ylab(paste(axis_titles[[type]], "in", prev_stage)) + guides(fill = "none") +
     scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))
   ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "H3K4me3") + xlab(paste(axis_titles[[type]], "in", prev_stage)) + guides(color = "none") +

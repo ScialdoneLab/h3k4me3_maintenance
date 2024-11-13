@@ -267,13 +267,13 @@ if(remove_ND){
 hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
 
 col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
-h1 <- Heatmap(hm_values.log, row_split = tpms_ct_plot$Category, name="log2(TPM+1)",
+h1 <- Heatmap(hm_values.log, use_raster = TRUE, row_split = tpms_ct_plot$Category, name="log2(TPM+1)",
                cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
                col = cols_biscale, row_title_gp = gpar(cex=0.5), left_annotation = rowAnnotation(Category = tpms_ct_plot$Category, col = list(Category = unlist(cols_rna))))
 
 draw(h1)
 
-pdf("output/rna/rna_dynamics_heatmap.pdf", width=6, height=8)
+pdf("output/rna/rna_dynamics_heatmap.pdf", width=8, height=4)
 draw(h1)
 dev.off()
 ```
@@ -289,7 +289,7 @@ if(remove_ND){
 hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
 
 col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
-h1 <- Heatmap(hm_values.log, row_split = tpms_ct_plot$Timing, name="log2(TPM+1)",
+h1 <- Heatmap(hm_values.log, use_raster = TRUE, row_split = tpms_ct_plot$Timing, name="log2(TPM+1)",
                cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
                col = cols_biscale, row_title_gp = gpar(cex=0.5), left_annotation = rowAnnotation(Timing = tpms_ct_plot$Timing, col = list(Timing = unlist(cols_rna_timing))))
 
@@ -319,7 +319,7 @@ plot_data$Time <- factor(plot_data$Time)
 if(remove_gametes){plot_data <- plot_data[!plot_data$Time %in% c("Egg", "Spermatid"),]
 }else{plot_data$Category <- factor(plot_data$Category, levels=c("GS", "GZ", "ZS", "ND"))}
 
-ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", add.params = list(fill = "white")) + labs(y = "log2(TPM+1)") +  theme_pubr() + scale_fill_manual(values=cols_rna) + facet_wrap(~Category, scale="fixed", ncol = 4) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4") + theme(legend.title=element_blank())
+ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) + labs(y = "log2(TPM+1)") +  theme_pubr() + scale_fill_manual(values=cols_rna) + facet_wrap(~Category, scale="fixed", ncol = 4) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4") + theme(legend.title=element_blank())
 ```
 
 ## Balloon plot
@@ -331,9 +331,13 @@ ggsave('output/rna/rna_timing_balloon_plot.pdf', width=5, height=3)
 ## Violin / ECDF plot
 ```{r}
 data <- list(ZGA = log2(as.data.frame(expression.data, row.names=allgenes$gene_id) + 1))
-expression_plot <- plot_stage_dynamics(data, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="ZGA", type="X9hpf")
+expression_plot <- plot_stage_dynamics(data, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="ZGA", type="X9hpf", plot="violin")
 grid.arrange(expression_plot)
-ggsave('output/rna/rna_timing_9hpf_violin_ecdf.pdf', expression_plot, width=10, height=5)
+ggsave('output/rna/rna_timing_9hpf_violin_plot.pdf', expression_plot, width=5, height=4)
+
+expression_plot <- plot_stage_dynamics(data, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="ZGA", type="X9hpf", plot="ecdf")
+grid.arrange(expression_plot)
+ggsave('output/rna/rna_timing_9hpf_ecdf_plot.pdf', expression_plot, width=5, height=4)
 ```
 
 ## GO analysis on each gene group
@@ -363,18 +367,18 @@ go_dyns <- rna_dyns[!names(rna_dyns) %in% c("ND", "NonZygotic")]
 go_list <- lapply(go_dyns, go_enrichment)
 go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
 go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
-pdf(file="output/rna/GO_summary_rna_dynamics.pdf", width=10, height=6)
+pdf(file="output/rna/GO_summary_rna_dynamics.pdf", width=8, height=6)
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
 dev.off()
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
 ```
 ```{r fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
 p_adj = 0.01
-go_dyns <- rna_dyns_timing#[!names(rna_dyns_timing) %in% c("ND", "NonZygotic")]
+go_dyns <- rna_dyns_timing[!names(rna_dyns_timing) %in% c("ND", "NonZygotic")]
 go_list <- lapply(go_dyns, go_enrichment)
 go_list <- go_list[unlist(lapply(go_list, function(enrichGO){sum(enrichGO@result$p.adjust<p_adj) > 0}))]
 go_list <- lapply(go_list, function(x) x$ID[x$p.adjust < p_adj])
-pdf(file="output/rna/GO_summary_rna_timing_dynamics.pdf", width=10, height=6)
+pdf(file="output/rna/GO_summary_rna_timing_dynamics.pdf", width=8, height=6)
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")
 dev.off()
 simplifyGOFromMultipleLists(go_list, padj_cutoff=p_adj, db = 'org.Xl.eg.db', ont = "BP")

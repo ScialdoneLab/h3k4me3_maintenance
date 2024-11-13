@@ -131,30 +131,30 @@ names(chip_norm_mats) <- stages
 ## Load peak calling data (broad)
 ```{r message=FALSE, warning=FALSE}
 # Load bed files for spermatid, sperm, pre-ZGA, post-ZGA
-D0_bed1 <- import(paste0(spermatid_dir, "broad/", "GSM1944497_broad.bed"), format = "bed")
-D0_bed2 <- import(paste0(spermatid_dir, "broad/", "GSM1944498_broad.bed"), format = "bed")
-D0_bed3 <- import(paste0(spermatid_dir, "broad/", "GSM1944499_broad.bed"), format = "bed")
+D0_bed1 <- import(paste0(spermatid_dir, "peaks/", "GSM1944497_broad.bed"), format = "bed")
+D0_bed2 <- import(paste0(spermatid_dir, "peaks/", "GSM1944498_broad.bed"), format = "bed")
+D0_bed3 <- import(paste0(spermatid_dir, "peaks/", "GSM1944499_broad.bed"), format = "bed")
 D0_spdH3K4me3_bed <- c(D0_bed1, D0_bed2, D0_bed3)
 strand(D0_spdH3K4me3_bed) <- NA
 
 if (sperm_data == "Oikawa") {
-  D1_bed2 <- import(paste0(sperm_dir, "broad/", "GSM3587295_broad.bed"), format = "bed")
-  D1_bed3 <- import(paste0(sperm_dir, "broad/", "GSM3587296_broad.bed"), format = "bed")
+  D1_bed2 <- import(paste0(sperm_dir, "peaks/", "GSM3587295_broad.bed"), format = "bed")
+  D1_bed3 <- import(paste0(sperm_dir, "peaks/", "GSM3587296_broad.bed"), format = "bed")
   D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
 } else if (sperm_data == "Teperek") {
-  D1_bed2 <- import(paste0(sperm_dir, "broad/", "GSM1944481_broad.bed"), format = "bed")
-  D1_bed3 <- import(paste0(sperm_dir, "broad/", "GSM1944483_broad.bed"), format = "bed")
+  D1_bed2 <- import(paste0(sperm_dir, "peaks/", "GSM1944481_broad.bed"), format = "bed")
+  D1_bed3 <- import(paste0(sperm_dir, "peaks/", "GSM1944483_broad.bed"), format = "bed")
   D1_spH3K4me3_bed <- c(D1_bed2, D1_bed3)
 }
 strand(D1_spH3K4me3_bed) <- NA
 
-D3_bed1 <- import(paste0(pre_zga_dir, "broad/", "GSM3671368_broad.bed"), format = "bed")
-D3_bed2 <- import(paste0(pre_zga_dir, "broad/", "GSM3671369_broad.bed"), format = "bed")
+D3_bed1 <- import(paste0(pre_zga_dir, "peaks/", "GSM3671368_broad.bed"), format = "bed")
+D3_bed2 <- import(paste0(pre_zga_dir, "peaks/", "GSM3671369_broad.bed"), format = "bed")
 D3_S7H3K4me3_bed <- c(D3_bed1, D3_bed2)
 strand(D3_S7H3K4me3_bed) <- NA
 
-D6_bed1 <- import(paste0(zga_dir, "broad/", "GSM1973491_broad.bed"), format = "bed")
-D6_bed2 <- import(paste0(zga_dir, "broad/", "GSM1973492_broad.bed"), format = "bed")
+D6_bed1 <- import(paste0(zga_dir, "peaks/", "GSM1973491_broad.bed"), format = "bed")
+D6_bed2 <- import(paste0(zga_dir, "peaks/", "GSM1973492_broad.bed"), format = "bed")
 D6_S10H3K4me3_bed <- c(D6_bed1, D6_bed2)
 strand(D6_S10H3K4me3_bed) <- NA
 

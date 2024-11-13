@@ -40,7 +40,7 @@ spermatid_cov <- c(spermatid_cov1, spermatid_cov2, spermatid_cov3)
 #Delete individual replicates
 rm(spermatid_cov1, spermatid_cov2, spermatid_cov3)
 
-DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage", value_name="DNAme (log2+1)", enriched_score=TRUE)
+DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage", value_name="DNAme (log2+1)")
 ```
 
 ## Load DNAme Sperm
@@ -48,18 +48,18 @@ DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage",
 dname_sperm_dir <- 'data/raw/dname/sperm/'
 
 #IP coverage replicates
-D2_cov1 <- readRDS(paste0(dname_sperm_dir, "GSM1944464_ranges.rds"))
-D2_cov2 <- readRDS(paste0(dname_sperm_dir, "GSM1944465_ranges.rds"))
-D2_cov3 <- readRDS(paste0(dname_sperm_dir, "GSM1944466_ranges.rds"))
-D2_spDNAme_cov <- c(D2_cov1, D2_cov2, D2_cov3)
+sperm_cov1 <- readRDS(paste0(dname_sperm_dir, "GSM1944464_ranges.rds"))
+sperm_cov2 <- readRDS(paste0(dname_sperm_dir, "GSM1944465_ranges.rds"))
+sperm_cov3 <- readRDS(paste0(dname_sperm_dir, "GSM1944466_ranges.rds"))
+sperm_cov <- c(sperm_cov1, sperm_cov2, sperm_cov3)
 
 #Delete individual replicates
-rm(D2_cov1, D2_cov2, D2_cov3)
+rm(sperm_cov1, sperm_cov2, sperm_cov3)
 
-suppressWarnings({D2_spDNAme_cov <- resize(D2_spDNAme_cov, 200)})
-D2_spDNAme_cov <- trim(D2_spDNAme_cov)
-D2_spDNAme_cov <- D2_spDNAme_cov[seqnames(D2_spDNAme_cov) %in% chr]
-DNAme_sperm <- enrichment(D2_spDNAme_cov, "DNAme Sperm", value_name="DNAme (log2+1)", enriched_score=TRUE)
+suppressWarnings({sperm_cov <- resize(sperm_cov, 200)})
+sperm_cov <- trim(sperm_cov)
+sperm_cov <- sperm_cov[seqnames(sperm_cov) %in% chr]
+DNAme_sperm <- enrichment(sperm_cov, "DNAme Sperm", value_name="DNAme (log2+1)")
 ```
 
 ## Load DNAme Pre-ZGA
@@ -67,18 +67,92 @@ DNAme_sperm <- enrichment(D2_spDNAme_cov, "DNAme Sperm", value_name="DNAme (log2
 dname_pre_zga_dir <- 'data/raw/dname/pre_zga/'
 
 #IP coverage replicates
-D4_cov1 <- readRDS(paste0(dname_pre_zga_dir, "3a_256c_IP_ranges.rds"))
-D4_cov2 <- readRDS(paste0(dname_pre_zga_dir, "3b_256c_IP_ranges.rds"))
-D4_S7DNAme_cov <- c(D4_cov1, D4_cov2)
+pre_zga_cov1 <- readRDS(paste0(dname_pre_zga_dir, "3a_256c_IP_ranges.rds"))
+pre_zga_cov2 <- readRDS(paste0(dname_pre_zga_dir, "3b_256c_IP_ranges.rds"))
+pre_zga_cov <- c(pre_zga_cov1, pre_zga_cov2)
 
 #Delete individual replicates
-rm(D4_cov1, D4_cov2)
+rm(pre_zga_cov1, pre_zga_cov2)
 
-D4_S7DNAme_cov <- D4_S7DNAme_cov[seqnames(D4_S7DNAme_cov) %in% chr]
-DNAme_prezga <- enrichment(D4_S7DNAme_cov, "DNAme Pre-ZGA", value_name="DNAme (log2+1)", enriched_score=TRUE)
+pre_zga_cov <- pre_zga_cov[seqnames(pre_zga_cov) %in% chr]
+DNAme_pre_zga <- enrichment(pre_zga_cov, "DNAme Pre-ZGA", value_name="DNAme (log2+1)")
+```
+
+## Load peak calling data
+```{r message=FALSE, warning=FALSE}
+spermatid_peaks1 <- import(paste0(dname_spermatid_dir, "peaks/", "GSM1944470.bed"), format = "bed")
+spermatid_peaks2 <- import(paste0(dname_spermatid_dir, "peaks/", "GSM1944471.bed"), format = "bed")
+spermatid_peaks3 <- import(paste0(dname_spermatid_dir, "peaks/", "GSM1944472.bed"), format = "bed")
+spermatid_peaks <- c(spermatid_peaks1, spermatid_peaks2, spermatid_peaks3)
+
+#Delete individual replicates
+rm(spermatid_peaks1, spermatid_peaks2, spermatid_peaks3)
+```
+```{r message=FALSE, warning=FALSE}
+sperm_peaks1 <- import(paste0(dname_sperm_dir, "peaks/", "GSM1944464.bed"), format = "bed")
+sperm_peaks2 <- import(paste0(dname_sperm_dir, "peaks/", "GSM1944465.bed"), format = "bed")
+sperm_peaks3 <- import(paste0(dname_sperm_dir, "peaks/", "GSM1944466.bed"), format = "bed")
+sperm_peaks <- c(sperm_peaks1, sperm_peaks2, sperm_peaks3)
+
+#Delete individual replicates
+rm(sperm_peaks1, sperm_peaks2, sperm_peaks3)
+```
+```{r message=FALSE, warning=FALSE}
+pre_zga_peaks1 <- import(paste0(dname_pre_zga_dir, "peaks/", "3a_256c_b.bed"), format = "bed")
+pre_zga_peaks2 <- import(paste0(dname_pre_zga_dir, "peaks/", "3b_256c_b.bed"), format = "bed")
+pre_zga_peaks <- c(pre_zga_peaks1, pre_zga_peaks2)
+
+#Delete individual replicates
+rm(pre_zga_peaks1, pre_zga_peaks2)
 ```
 
 ```{r}
+DNAme_norm_mats <- list("Spermatid"=DNAme_spermatid, "Sperm"=DNAme_sperm, "Pre-ZGA"=DNAme_pre_zga)
+DNAme_stages <- c("Spermatid"=spermatid_peaks, "Sperm"=sperm_peaks, "Pre-ZGA"=pre_zga_peaks)
+```
+
+```{r}
+promoters_1kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
+stages = names(DNAme_stages)
+names(stages) <- stages
+
+overlaps <- lapply(DNAme_stages, function(x) {
+  findOverlaps(promoters_1kb, x, select = "first")
+})
+
+peak_widths <- lapply(stages, function(y) {
+  sapply(overlaps[[y]], function(x) {
+    if (is.na(x)) {
+      0
+    } else {
+      width(DNAme_stages[[y]][x])
+    }
+  })
+})
+
+peak_binary <- lapply(peak_widths, function(x) {
+  x > 0
+})
+
+build_df <- function(norm_matrix, binarized, widths) {
+  df <- data.frame(
+    "promoter.enrich" = enriched_score(norm_matrix),
+    "peak" = binarized,
+    "peak.width" = widths,
+    "promoter.max" = apply(norm_matrix, 1, max),
+    "promoter.mean" = rowMeans(norm_matrix),
+    row.names = allgenes$gene_id
+  )
+}
+
+DNAme_dfs <- lapply(stages, function(x) {
+  build_df(DNAme_norm_mats[[x]], peak_binary[[x]], peak_widths[[x]])
+})
+names(DNAme_dfs) <- stages
+```
+
+
+```{r}
 # Save data
-save(DNAme_spermatid, DNAme_sperm, DNAme_prezga, file = paste0("data/processed/dname.RData"))
+save(DNAme_norm_mats, DNAme_dfs, DNAme_stages, allgenes, file = paste0("data/processed/dname.RData"))
 ```
