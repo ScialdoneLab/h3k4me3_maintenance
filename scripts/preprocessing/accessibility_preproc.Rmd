@@ -56,13 +56,52 @@ strand(accessibility_peaks) <- NA
 ```
 
 ```{r}
-accessibility_norm <- enrichment(pre_zga_cov, "Accessibility Pre-ZGA", value_name="Accessibility (log2+1)")
-accessibility_df <- enriched_score(accessibility_norm)
-accessibility_stage <- accessibility_peaks
-accessibility_norm_mat <- list("Pre-ZGA"=accessibility_norm)
+accessibility_norm_mats <- list( "Pre-ZGA"=enrichment(pre_zga_cov, "Accessibility Pre-ZGA", value_name=expression("Accessibility [log"[2]*"]")))
+accessibility_stages <- c("Pre-ZGA" = accessibility_peaks)
+```
+
+
+```{r}
+promoters_1kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
+stages = names(accessibility_stages)
+names(stages) <- stages
+
+overlaps <- lapply(accessibility_stages, function(x) {
+  findOverlaps(promoters_1kb, x, select = "first")
+})
+
+peak_widths <- lapply(stages, function(y) {
+  sapply(overlaps[[y]], function(x) {
+    if (is.na(x)) {
+      0
+    } else {
+      width(accessibility_stages[[y]][x])
+    }
+  })
+})
+
+peak_binary <- lapply(peak_widths, function(x) {
+  x > 0
+})
+
+build_df <- function(norm_matrix, binarized, widths) {
+  df <- data.frame(
+    "promoter.enrich" = enriched_score(norm_matrix),
+    "peak" = binarized,
+    "peak.width" = widths,
+    "promoter.max" = apply(norm_matrix, 1, max),
+    "promoter.mean" = rowMeans(norm_matrix),
+    row.names = allgenes$gene_id
+  )
+}
+
+accessibility_dfs <- lapply(stages, function(x) {
+  build_df(accessibility_norm_mats[[x]], peak_binary[[x]], peak_widths[[x]])
+})
+names(accessibility_dfs) <- stages
 ```
 
 ```{r}
 # Save data
-save(accessibility_norm_mat, accessibility_df, accessibility_stage, file = paste0("data/processed/accessibility.RData"))
+save(accessibility_norm_mats, accessibility_dfs, accessibility_stages, file = paste0("data/processed/accessibility.RData"))
 ```

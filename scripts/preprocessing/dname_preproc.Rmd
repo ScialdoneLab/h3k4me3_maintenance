@@ -40,7 +40,7 @@ spermatid_cov <- c(spermatid_cov1, spermatid_cov2, spermatid_cov3)
 #Delete individual replicates
 rm(spermatid_cov1, spermatid_cov2, spermatid_cov3)
 
-DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage", value_name="DNAme (log2+1)")
+DNAme_spermatid <- enrichment(spermatid_cov, "DNAme Spermatid", mode="coverage", value_name=expression("DNAme [log"[2]*"]"))
 ```
 
 ## Load DNAme Sperm
@@ -59,7 +59,7 @@ rm(sperm_cov1, sperm_cov2, sperm_cov3)
 suppressWarnings({sperm_cov <- resize(sperm_cov, 200)})
 sperm_cov <- trim(sperm_cov)
 sperm_cov <- sperm_cov[seqnames(sperm_cov) %in% chr]
-DNAme_sperm <- enrichment(sperm_cov, "DNAme Sperm", value_name="DNAme (log2+1)")
+DNAme_sperm <- enrichment(sperm_cov, "DNAme Sperm", value_name=expression("DNAme [log"[2]*"]"))
 ```
 
 ## Load DNAme Pre-ZGA
@@ -75,7 +75,7 @@ pre_zga_cov <- c(pre_zga_cov1, pre_zga_cov2)
 rm(pre_zga_cov1, pre_zga_cov2)
 
 pre_zga_cov <- pre_zga_cov[seqnames(pre_zga_cov) %in% chr]
-DNAme_pre_zga <- enrichment(pre_zga_cov, "DNAme Pre-ZGA", value_name="DNAme (log2+1)")
+DNAme_pre_zga <- enrichment(pre_zga_cov, "DNAme Pre-ZGA", value_name=expression("DNAme [log"[2]*"]"))
 ```
 
 ## Load peak calling data

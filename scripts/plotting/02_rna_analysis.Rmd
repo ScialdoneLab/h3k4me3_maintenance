@@ -101,6 +101,7 @@ expression.7hpf = get_expression(rep1="GSM6076954", rep2="GSM6076955", rep3="GSM
 expression.8hpf = get_expression(rep1="GSM6076956", rep2="GSM6076957", rep3="GSM6076980", rep4="GSM6076981")
 expression.9hpf = get_expression(rep1="GSM6076958", rep2="GSM6076959", rep3="GSM6076982", rep4="GSM6076983")
 expression.data = list("Spermatid"=expression.spermatid, "6hpf"=expression.6hpf, "7hpf"=expression.7hpf, "8hpf"=expression.8hpf, "9hpf"=expression.9hpf)
+expression.data = lapply(expression.data, function(x) log2(x + 1))
 
 zga_nascent.stages <- get_zga_genes(stringent = TRUE, total=FALSE)
 zga_nascent.6hpf <- zga_nascent.stages[["6hpf"]]
@@ -267,7 +268,7 @@ if(remove_ND){
 hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
 
 col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
-h1 <- Heatmap(hm_values.log, use_raster = TRUE, row_split = tpms_ct_plot$Category, name="log2(TPM+1)",
+h1 <- Heatmap(hm_values.log, use_raster = TRUE, row_split = tpms_ct_plot$Category, heatmap_legend_param = list(title = expression("TPM [log"[2]*"]")),
                cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
                col = cols_biscale, row_title_gp = gpar(cex=0.5), left_annotation = rowAnnotation(Category = tpms_ct_plot$Category, col = list(Category = unlist(cols_rna))))
 
@@ -289,7 +290,7 @@ if(remove_ND){
 hm_values.log <- as.matrix(log2(tpms_ct_plot[ ,1:6]+1))
 
 col_split = factor(c(rep("Spermatid", 1), rep("Egg", 1), rep("ZGA", 4)))
-h1 <- Heatmap(hm_values.log, use_raster = TRUE, row_split = tpms_ct_plot$Timing, name="log2(TPM+1)",
+h1 <- Heatmap(hm_values.log, use_raster = TRUE, row_split = tpms_ct_plot$Timing, heatmap_legend_param = list(title = expression("TPM [log"[2]*"]")),
                cluster_columns = FALSE, cluster_rows = FALSE, show_row_names = FALSE, column_split = col_split, row_title_rot = 0, cluster_row_slices = FALSE,
                col = cols_biscale, row_title_gp = gpar(cex=0.5), left_annotation = rowAnnotation(Timing = tpms_ct_plot$Timing, col = list(Timing = unlist(cols_rna_timing))))
 
@@ -319,7 +320,7 @@ plot_data$Time <- factor(plot_data$Time)
 if(remove_gametes){plot_data <- plot_data[!plot_data$Time %in% c("Egg", "Spermatid"),]
 }else{plot_data$Category <- factor(plot_data$Category, levels=c("GS", "GZ", "ZS", "ND"))}
 
-ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) + labs(y = "log2(TPM+1)") +  theme_pubr() + scale_fill_manual(values=cols_rna) + facet_wrap(~Category, scale="fixed", ncol = 4) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept=log(5+1, 2), linetype="dashed", color = "snow4") + theme(legend.title=element_blank())
+ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) + labs(y = expression("TPM [log"[2]*"]"),) +  theme_pubr() + scale_fill_manual(values=cols_rna) + facet_wrap(~Category, scale="fixed", ncol = 4) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_hline(yintercept=log2(5+1), linetype="dashed", color = "snow4") + theme(legend.title=element_blank())
 ```
 
 ## Balloon plot
@@ -330,7 +331,7 @@ ggsave('output/rna/rna_timing_balloon_plot.pdf', width=5, height=3)
 
 ## Violin / ECDF plot
 ```{r}
-data <- list(ZGA = log2(as.data.frame(expression.data, row.names=allgenes$gene_id) + 1))
+data <- list(ZGA = as.data.frame(expression.data, row.names=allgenes$gene_id))
 expression_plot <- plot_stage_dynamics(data, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint="ZGA", type="X9hpf", plot="violin")
 grid.arrange(expression_plot)
 ggsave('output/rna/rna_timing_9hpf_violin_plot.pdf', expression_plot, width=5, height=4)

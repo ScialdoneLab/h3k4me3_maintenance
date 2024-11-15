@@ -27,7 +27,7 @@ names(mapnames) <- se_1_2@elementMetadata@listData$id
 ```
 
 ```{r}
-remove_sustained <- TRUE
+remove_sustained <- FALSE
 if (remove_sustained) {
     se_1_2 <- se_1_2[, !grepl("-IAA", se_1_2@colData@listData$condition)]
     se_3_4 <- se_3_4[, !grepl("-IAA", se_3_4@colData@listData$condition)]
@@ -39,6 +39,9 @@ if (remove_sustained) {
 plot_auxin <- function(rep, control, zygotic_only, plot = "heatmap", dynamic = NULL, tp = NULL, only_de=FALSE, hm_rows="chip_dyns") {
     if (zygotic_only) {
         se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
+    }
+    if(!is.null(dynamic)){
+        se <- se[mapnames[rownames(se)] %in% chip_dyns[[dynamic]], ]
     }
     se <- se[, se@colData@listData$experiment_set == rep]
 
@@ -117,10 +120,6 @@ plot_auxin <- function(rep, control, zygotic_only, plot = "heatmap", dynamic = N
         up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up")))
         down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down")))
         de_list <- list("up" = up_list, "down" = down_list, "no change" = setdiff(rownames(tpms_norm), union(up_list, down_list)))
-
-        if (zygotic_only) {
-            tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
-        }
 
         if (only_de) {
             tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(up_list, down_list), ]

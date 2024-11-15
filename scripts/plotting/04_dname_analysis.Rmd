@@ -52,7 +52,7 @@ rm(Xenla10.1_TxDb)
 ```{r}
 DNAme_dfs[["ZGA"]] <- DNAme_dfs[["Pre-ZGA"]]
 
-dname_groups <- list(Kept = "Y_Y_Y_Y", Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"), Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
+dname_groups <- list(Kept = "Y_Y_Y_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N") #Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"),
 dname_names_complete <- c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N", "Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N", "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N", "N_N_Y_Y", "N_N_Y_N", "N_N_N_Y", "N_N_N_N")
 dname_groups_complete <- setNames(as.list(dname_names_complete), dname_names_complete)
 peak_combinations <- compute_peak_combinations(DNAme_dfs)
@@ -113,7 +113,7 @@ ggsave('output/dname/dname_dynamics_stacked_bar.pdf', width=2, height=5)
 ```
 ## Alluvial plots
 ```{r message=FALSE, warning=FALSE}
-dyns = dna_me_dyns
+dyns = dname_dyns
 
 plot_alluvial <- function(remove_NNNN, remove_YYYY, equal_scale){
   get_row <- function(dyns){

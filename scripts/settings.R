@@ -1,9 +1,9 @@
 # axis
-axis_titles <- list("peak.width" = "Peak breadth", "promoter.mean" = "Peak mean", "X9hpf" = "RNA expression at 9hpf [log]", "expression.6hpf" = "RNA expression at 6hpf [log]", "expression.7hpf" = "RNA expression at 7hpf [log]", "expression.8hpf" = "RNA expression at 8hpf [log]", "expression.9hpf" = "RNA expression at 9hpf [log]", "cg.density" = "CG density", "promoter.dna.methyl" = "DNA methylation", "promoter.accessibility" = "Accessibility", "expression" = "RNA expression")
+axis_titles <- list("peak.width" = "H3K4me3 peak breadth", "promoter.mean" = "H3K4me3 enrichment", "X9hpf" = "RNA expression at 9hpf [log2]", "expression.6hpf" = "RNA expression at 6hpf [log]", "expression.7hpf" = "RNA expression at 7hpf [log]", "expression.8hpf" = "RNA expression at 8hpf [log]", "expression.9hpf" = "RNA expression at 9hpf [log]", "cg.density" = "CG density", "promoter.dna.methyl" = "DNA methylation enrichment", "promoter.accessibility" = "Accessibility enrichment", "expression" = "RNA expression")
 
 # colors
-cols_chip <- setNames(c("#DDAA33", "#228833", "#BB5566", "#004488", "#DDDDDD"), c("Kept", "Recovered", "Lost", "Gained", "Absent"))
-cols_chip_detail <- setNames(c("#DDCC77", "#009988", "#44BB99", "#228833", "#CC6677", "#882255", "#AA4499", "#332288", "#88CCEE", "#DDDDDD"), c("Kept", "RecoveredLate", "RecoveredEarly", "RecoveredLong", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm", "GainedEarly", "GainedLate", "Absent"))
+cols_chip <- setNames(c("#DDAA33", "#BB5566", "#004488", "#DDDDDD"), c("Kept", "Lost", "Gained", "Absent")) #Recovered="#228833"
+cols_chip_detail <- setNames(c("#DDCC77", "#CC6677", "#882255", "#AA4499", "#332288", "#88CCEE", "#DDDDDD"), c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm", "GainedEarly", "GainedLate", "Absent")) #"RecoveredLate", "RecoveredEarly", "RecoveredLong", "#009988", "#44BB99", "#228833",
 cols_chip_complete <- setNames(c("#ece0d3", "#a6afb7", "#937c65", "#625c5a", "#be8162", "#713725", "#b73a2f", "#e17e39", "#f2c237", "#6ca239", "#36753d", "#3b4ca8", "#5f91c1", "#6bc7ab", "#d0589f", "#8d55ae"), c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N", "Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N", "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N", "N_N_Y_Y", "N_N_Y_N", "N_N_N_Y", "N_N_N_N"))
 
 cols_rna <- c(GS = "#009988", GZ = "#EE7733", ZS = "#6699CC", ND = "#666666")

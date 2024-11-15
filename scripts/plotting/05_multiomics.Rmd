@@ -24,16 +24,16 @@ load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```{r}
 chip_dfs[["Spermatid"]]$cg.density <- unname(cg_density[allgenes$gene_id])
 chip_dfs[["Spermatid"]]$cg.density[is.na(chip_dfs[["Spermatid"]]$cg.density)] <- 0
-chip_dfs[["Spermatid"]]$promoter.dna.methyl <- DNAme_dfs[["Spermatid"]]
+chip_dfs[["Spermatid"]]$promoter.dna.methyl <- DNAme_dfs[["Spermatid"]]$promoter.mean
 chip_dfs[["Sperm"]]$promoter.dna.methyl <- DNAme_dfs[["Sperm"]]$promoter.mean
 chip_dfs[["Pre-ZGA"]]$promoter.dna.methyl <- DNAme_dfs[["Pre-ZGA"]]$promoter.mean
-chip_dfs[["Pre-ZGA"]]$promoter.accessibility <- accessibility_df
+chip_dfs[["Pre-ZGA"]]$promoter.accessibility <- accessibility_dfs[["Pre-ZGA"]]$promoter.mean
 
-chip_dfs[["Spermatid"]]$expression <- log(expression.data[["Spermatid"]] + 1)
-chip_dfs[["ZGA"]]$expression.6hpf <- log(expression.data[["6hpf"]] + 1)
-chip_dfs[["ZGA"]]$expression.7hpf <- log(expression.data[["7hpf"]] + 1)
-chip_dfs[["ZGA"]]$expression.8hpf <- log(expression.data[["8hpf"]] + 1)
-chip_dfs[["ZGA"]]$expression.9hpf <- log(expression.data[["9hpf"]] + 1)
+chip_dfs[["Spermatid"]]$expression <- expression.data[["Spermatid"]]
+chip_dfs[["ZGA"]]$expression.6hpf <- expression.data[["6hpf"]]
+chip_dfs[["ZGA"]]$expression.7hpf <- expression.data[["7hpf"]]
+chip_dfs[["ZGA"]]$expression.8hpf <- expression.data[["8hpf"]]
+chip_dfs[["ZGA"]]$expression.9hpf <- expression.data[["9hpf"]]
 chip_dfs[["Spermatid"]]$expression[is.na(chip_dfs[["Spermatid"]]$expression)] <- 0
 chip_dfs[["ZGA"]]$expression.6hpf[is.na(chip_dfs[["ZGA"]]$expression.6hpf)] <- 0
 chip_dfs[["ZGA"]]$expression.7hpf[is.na(chip_dfs[["ZGA"]]$expression.7hpf)] <- 0
@@ -49,7 +49,7 @@ gg_color_hue <- function(n) {
 }
 
 Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
-pre_zga_data <- list("H3K4me3" = h3k4stages[["Pre-ZGA"]], "DNAme" = DNAme_stages[["Pre-ZGA"]], "Accessibility" = accessibility_stage)
+pre_zga_data <- list("H3K4me3" = h3k4stages[["Pre-ZGA"]], "DNAme" = DNAme_stages[["Pre-ZGA"]], "Accessibility" = accessibility_stages[["Pre-ZGA"]])
 genodis <- lapply(pre_zga_data, function(x) {
   assignChromosomeRegion(x,
     nucleotideLevel = FALSE, proximal.promoter.cutoff = c(upstream = 1000, downstream = 1000), precedence = c("Promoters", "immediateDownstream", "fiveUTRs", "threeUTRs", "Exons", "Introns"),
@@ -78,7 +78,7 @@ rm(Xenla10.1_TxDb)
 ```{r}
 h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
   use_raster = TRUE,
-  name = "H3K4me3",
+  heatmap_legend_param = list(title = expression("H3K4me3 [log"[2]*"]")),
   column_title = "H3K4me3",
   width = 4,
   axis_name = c("-1kb", "TSS", "+1kb"),
@@ -88,7 +88,7 @@ h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
 
 dname_heatmap <- EnrichedHeatmap(DNAme_norm_mats[["Pre-ZGA"]],
   use_raster = TRUE,
-  name = "DNAme",
+  heatmap_legend_param = list(title = expression("DNAme [log"[2]*"]")),
   column_title = "DNAme",
   width = 4,
   axis_name = c("-1kb", "TSS", "+1kb"),
@@ -104,7 +104,7 @@ cg_density_heatmap <- Heatmap(log2(unname(cg_density[allgenes$gene_id]+1)),
   width = 1,
   column_title = "",
   column_title_side = "top",
-  name = "CG density",
+  heatmap_legend_param = list(title = expression("CG density [log"[2]*"]")),
   col = colorRamp2(c(0, 0.05), c("white", "black")),
 )
 
@@ -120,9 +120,9 @@ dev.off()
 ## EnrichedHeatmap with accessibility split
 ```{r} 
 set.seed(123)
-accessibility_df <- EnrichedHeatmap(accessibility_norm_mat,
+accessibility_heatmap <- EnrichedHeatmap(accessibility_norm_mats[["Pre-ZGA"]],
   use_raster = TRUE,
-  name = "Accessibility",
+  heatmap_legend_param = list(title = expression("Accessibility [log"[2]*"]")),
   column_title = "Accessibility",
   width = 4,
   axis_name = c("-1kb", "TSS", "+1kb"),
@@ -133,7 +133,7 @@ accessibility_df <- EnrichedHeatmap(accessibility_norm_mat,
 
 h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
   use_raster = TRUE,
-  name = "H3K4me3",
+  heatmap_legend_param = list(title = expression("H3K4me3 [log"[2]*"]")),
   column_title = "H3K4me3",
   width = 4,
   axis_name = c("-1kb", "TSS", "+1kb"),
@@ -141,7 +141,7 @@ h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
   top_annotation = HeatmapAnnotation(enrich = anno_enriched(axis_param = list(side = "right"), gp = gpar(col = 1)))
 )
 
-hm <- accessibility_df + h3k4me3_heatmap
+hm <- accessibility_heatmap + h3k4me3_heatmap
 draw(hm)
 
 pdf("output/multiomic/enriched_heatmap_h3k4me3_accessibility.pdf", width = 4, height = 6)
@@ -169,15 +169,15 @@ for (stage in c("Spermatid", "Sperm", "Pre-ZGA")) {
 }
 ```
 ```{r}
-plot_peak(accessibility_norm_mat, stage = "Pre-ZGA", dyns = rna_dyns, cols = cols_rna, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
+plot_peak(accessibility_norm_mats, stage = "Pre-ZGA", dyns = rna_dyns, cols = cols_rna, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
 ggsave(file = paste0("output/multiomic/", stage, "_accessibility_rna_dynamics_peak.pdf"), width = 5, height = 4)
 ```
 ```{r}
-plot_peak(accessibility_norm_mat, stage = "Pre-ZGA", dyns = rna_dyns_timing, cols = cols_rna_timing, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
+plot_peak(accessibility_norm_mats, stage = "Pre-ZGA", dyns = rna_dyns_timing, cols = cols_rna_timing, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
 ggsave(file = paste0("output/multiomic/", stage, "_accessibility_rna_timing_dynamics_peak.pdf"), width = 5, height = 4)
 ```
 ```{r}
-plot_peak(accessibility_norm_mat, stage = "Pre-ZGA", dyns = chip_dyns, cols = cols_chip, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
+plot_peak(accessibility_norm_mats, stage = "Pre-ZGA", dyns = chip_dyns, cols = cols_chip, remove_NA = TRUE, onlypeaks = FALSE, label = "DamID")
 ggsave(file = paste0("output/multiomic/", stage, "_accessibility_chip_dynamics_peak.pdf"), width = 5, height = 4)
 ```
 
@@ -529,13 +529,13 @@ split <- factor(cluster_order[kclus$cluster]) # levels=cluster_order)
 col_fun <- colorRamp2(seq(-2, 2), rev(COL2("RdBu", n = 5)))
 hm1 <- Heatmap(t(scaled_data),
   use_raster = TRUE,
-  name = "Mean (z-score)",
+  name = "z-score",
   col = col_fun,
   # column_title = "Datasets", row_title = "Genes",
   show_row_dend = FALSE,
   cluster_columns = FALSE,
   show_row_names = TRUE,
-  row_order = c("H3K4me3 mean", "CG density", "DNA methylation", "Accessibility"),
+  row_order = c("H3K4me3", "CG density", "DNA methylation", "Accessibility"),
   show_column_names = FALSE,
   # column_order = c("promoter.enrich", "peak.width", "promoter.dna.methyl", "promoter.accessibility"),
   column_split = split,

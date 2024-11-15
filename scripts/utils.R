@@ -52,7 +52,7 @@ readGranges <- function(filename) {
   granges_chr <- granges[seqnames(granges) %in% chr]
 }
 
-enrichment <- function(coverage, title, mode = "ranges", value_name = "H3K4me3 enrichment", enriched_score = FALSE) {
+enrichment <- function(coverage, title, mode = "ranges", value_name = NULL) {
   if (mode == "ranges") {
     coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
   } else if (mode == "coverage") {
@@ -61,17 +61,12 @@ enrichment <- function(coverage, title, mode = "ranges", value_name = "H3K4me3 e
   coverage <- log2(coverage + 1)
   hm <- EnrichedHeatmap(coverage,
     use_raster = TRUE,
-    name = value_name,
+    heatmap_legend_param = list(title = value_name),
     column_title = title,
     col = c("blue", "red"),
     axis_name = c("-1kb", "TSS", "+1kb")
   )
   draw(hm)
-  if (enriched_score) {
-    return(enriched_score(coverage))
-  } else {
-
-  }
   return(coverage)
 }
 
@@ -100,13 +95,13 @@ plot_peak <- function(data, stage, dyns, cols, onlypeaks = FALSE, remove_NA = TR
     add = "mean_se", conf.int = TRUE, color = "dynamics"
   ) + scale_color_manual(values = cols) + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + ggtitle(stage) + guides(color = "none")
   if (label == "DNAme") {
-    plot <- plot + labs(y = expression(atop(Mean ~ DNAme ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ DNAme ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
   } else if (label == "H3K4me3") {
-    plot <- plot + labs(y = expression(atop(Mean ~ H3K4me3 ~ ChIP - Seq ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ H3K4me3 ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
   } else if (label == "DamID") {
-    plot <- plot + labs(y = expression(atop(Mean ~ DamID ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ DamID ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
   } else {
-    plot <- plot + labs(y = expression(atop(Mean ~ intensity, log[2](Coverage + 1))), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
   }
 }
 
@@ -168,15 +163,20 @@ plot_stage_dynamics <- function(data, dyns, cols, timepoint, type, onlypeaks = F
       ylab(axis_titles[[type]]) +
       theme(axis.title.x = element_blank())
     if (add_signif) {
-      comp_group <- c("Kept", "Expressed@6hpf", "GZ")
-      x_comps <- setdiff(levels(plot_df$dyn), comp_group)
-      x_comp <- intersect(levels(plot_df$dyn), comp_group)
-      if (type == "promoter.dna.methyl") {
-        x_comps <- rev(x_comps)
+      #comp_group <- c("Kept", "Expressed@6hpf", "GZ")
+      #x_comps <- setdiff(levels(plot_df$dyn), comp_group)
+      #x_comp <- intersect(levels(plot_df$dyn), comp_group)
+      #if (type == "promoter.dna.methyl") {
+      #  x_comps <- rev(x_comps)
+      #}
+      #comparisons <- list(c(x_comp, x_comps[1]), c(x_comp, x_comps[2]))
+      comparisons <- list()
+      dyn_levels <- levels(plot_df$dyn)
+      for (i in 1:(length(dyn_levels) - 1)) {
+        comparisons[[i]] <- c(dyn_levels[i + 1], dyn_levels[i])
       }
-      comparisons <- list(c(x_comp, x_comps[1]), c(x_comp, x_comps[2]))
 
-      violin_plot <- violin_plot + stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif")
+      violin_plot <- violin_plot + stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"), label.y = max(na.omit(violin_plot$data[[type]])) * (1 - seq_along(comparisons) * 0.1))
     }
     if (grouped) {
       violin_plot <- violin_plot + scale_x_discrete(breaks = pos, labels = cluster_order, drop = FALSE)
@@ -186,7 +186,7 @@ plot_stage_dynamics <- function(data, dyns, cols, timepoint, type, onlypeaks = F
     }
     plot <- violin_plot
   } else if (plot == "ecdf") {
-    ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values = cols) + guides(color = "none") + xlab(paste(axis_titles[[type]])) + ylab(paste0("F(", axis_titles[[type]], ")"))
+    ecdf_plot <- ggecdf(plot_df, x = paste(type), color = "dyn") + scale_colour_manual(values = cols) + guides(color = "none") + xlab(axis_titles[[type]]) + ylab(paste0("F(", axis_titles[[type]], ")"))
     if (legend) {
       ecdf_plot <- ecdf_plot + guides(color = guide_legend(nrow = 2))
     }
@@ -211,7 +211,7 @@ plot_balloonplot <- function(x_dyns, y_dyns, limit = 50, sort_similar = FALSE, r
   fisher_p <- function(row, column) {
     mat <- genesAbsolute
     fisher_mat <- matrix(c(mat[row, column], sum(mat[-row, column]), sum(mat[row, -column]), sum(mat[-row, -column])), nrow = 2)
-    p_val <- fisher.test(fisher_mat)$p.value
+    p_val <- fisher.test(fisher_mat, alternative="greater")$p.value
     return(max(p_val, 10^(-limit)))
   }
 

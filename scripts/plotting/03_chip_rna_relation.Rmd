@@ -54,13 +54,13 @@ upset(
 ## Peak line plots
 ```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
 for(stage in stages){
-  plot_peak(stage=stage, dyns=rna_dyns, cols=cols_rna, remove_NA=TRUE, onlypeaks=FALSE)
+  plot_peak(data=chip_norm_mats, stage=stage, dyns=rna_dyns, cols=cols_rna, remove_NA=TRUE, onlypeaks=FALSE, label = "H3K4me3")
   ggsave(file=paste0("output/rna_chip/", stage, "_rna_peak_plot.pdf"), width = 5, height = 4)
 }
 ```
 ```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
 for(stage in stages){
-  plot_peak(stage=stage, dyns=rna_dyns_timing, cols=cols_rna_timing, remove_NA=TRUE, onlypeaks=FALSE)
+  plot_peak(data=chip_norm_mats, stage=stage, dyns=rna_dyns_timing, cols=cols_rna_timing, remove_NA=TRUE, onlypeaks=FALSE, label = "H3K4me3")
   ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_peak_plot.pdf"), width = 5, height = 3)
 }
 ```
@@ -91,10 +91,10 @@ dev.off()
 ```{r fig.height=5, fig.width=4}
 cols_mod <- c(cols_chip[!names(cols_chip)%in%c("Recovered", "Lost", "Gained")], "Other"="darkgrey")
 dyns_mod = chip_dyns[c("Kept", "Absent")]
-dyns_mod[["Other"]] = unname(unlist(chip_dyns[c("Recovered", "Lost", "Gained")]))
+dyns_mod[["Other"]] = unname(unlist(chip_dyns[c("Lost", "Gained")]))  #Recovered in other
 
 genesAbsolute_mod = genesAbsolute[c("Kept", "Absent"),]
-genesAbsolute_mod["Other", ] <- colSums(genesAbsolute[c("Recovered", "Lost", "Gained"),])
+genesAbsolute_mod["Other", ] <- colSums(genesAbsolute[c("Lost", "Gained"),]) #Recovered in other
 
 ggdf1 <- melt(cbind(genesAbsolute_mod, rownames(genesAbsolute_mod)))
 names(ggdf1)<- c("H3K4me3", "RNA", "count")

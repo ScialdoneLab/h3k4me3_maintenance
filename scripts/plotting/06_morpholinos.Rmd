@@ -30,6 +30,9 @@ plot_morpholino <- function(rep, control, zygotic_only, plot = "heatmap", dynami
     if (zygotic_only) {
         se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
     }
+    if(!is.null(dynamic)){
+        se <- se[mapnames[rownames(se)] %in% chip_dyns[[dynamic]], ]
+    }
     se <- se[, sapply(se@colData@listData$group, function(x) extracted <- regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep]
 
     tpms <- se@assays@data@listData$tpms
@@ -113,10 +116,6 @@ plot_morpholino <- function(rep, control, zygotic_only, plot = "heatmap", dynami
         up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up")))
         down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down")))
         de_list <- list("up" = up_list, "down" = down_list, "no change"=setdiff(rownames(tpms_norm), union(up_list, down_list)))
-
-        if (zygotic_only) {
-            tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(rna_dyns$GZ, rna_dyns$ZS),]
-        }
 
         if(only_de){
          tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(up_list, down_list),]

@@ -50,8 +50,8 @@ rm(Xenla10.1_TxDb)
 
 ## H3K4me3 dynamics
 ```{r}
-chip_groups <- list(Kept = "Y_Y_Y_Y", Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"), Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N")
-chip_groups_detail <- list("Kept" = "Y_Y_Y_Y", "RecoveredLate"="Y_Y_N_Y", "RecoveredEarly"="Y_N_Y_Y", "RecoveredLong"="Y_N_N_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N")
+chip_groups <- list(Kept = "Y_Y_Y_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N") #Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y")
+chip_groups_detail <- list("Kept" = "Y_Y_Y_Y", "Lost@ZGA"="Y_Y_Y_N", "Lost@Pre-ZGA"="Y_Y_N_N", "Lost@Sperm"="Y_N_N_N", "GainedEarly"="N_N_Y_Y", "GainedLate"="N_N_N_Y", "Absent"="N_N_N_N") #"RecoveredLate"="Y_Y_N_Y", "RecoveredEarly"="Y_N_Y_Y", "RecoveredLong"="Y_N_N_Y", 
 chip_groups_removed <- list(N_Y_ = c("N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N"))
 
 #All groups
@@ -221,7 +221,7 @@ plot_alluvial(remove_NNNN = TRUE, remove_YYYY = TRUE, equal_scale=FALSE)
 ## Peak plots
 ```{r}
 for(stage in stages){
-  plot_peak(stage=stage, dyns=chip_dyns, cols=cols_chip, remove_NA=TRUE, onlypeaks=FALSE)
+  plot_peak(data=chip_norm_mats, stage=stage, dyns=chip_dyns, cols=cols_chip, remove_NA=TRUE, onlypeaks=FALSE, label = "H3K4me3")
   ggsave(file=paste0("output/chip/", stage, "_peak_plot.pdf"), width = 5, height = 4)
 }
 ```
@@ -250,8 +250,8 @@ for(stage in stages){
 }
 ```
 ```{r}
-dyns = c(chip_dyns_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")], chip_dyns["Recovered"])
-cols = c(cols_chip_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")], cols_chip["Recovered"])
+dyns = c(chip_dyns_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")])#, chip_dyns["Recovered"])
+cols = c(cols_chip_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")])#, cols_chip["Recovered"])
 
 g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="promoter.mean", plot="violin")
 grid.arrange(g)
@@ -262,8 +262,8 @@ grid.arrange(g)
 ggsave(file=paste0("output/chip/Spermatid_violin_plot_width_detail.pdf"), g, width = 5, height = 4)
 ```
 ```{r}
-dyns = c(chip_dyns_detail[c("Kept", "GainedEarly", "GainedLate")], chip_dyns["Recovered"])
-cols = c(cols_chip_detail[c("Kept", "GainedEarly", "GainedLate")], cols_chip["Recovered"])
+dyns = c(chip_dyns_detail[c("Kept", "GainedEarly", "GainedLate")])#, chip_dyns["Recovered"])
+cols = c(cols_chip_detail[c("Kept", "GainedEarly", "GainedLate")])#, cols_chip["Recovered"])
 
 g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="promoter.mean", plot = "violin")
 grid.arrange(g)
