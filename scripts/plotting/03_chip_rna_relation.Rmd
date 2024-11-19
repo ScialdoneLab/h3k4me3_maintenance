@@ -116,7 +116,7 @@ ggsave('output/rna_chip/ratio_h3k4me3_rna_dynamics_stacked.pdf', width=5, height
 ## Violin plots of H3K4me3 for RNA groups
 ```{r fig.height=5, fig.width=10}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="promoter.mean", plot = "violin")
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns, cols=cols_rna, timepoint=stage, type="promoter.enrich", plot = "violin")
   grid.arrange(g)
   ggsave(file=paste0("output/rna_chip/", stage, "_rna_dynamics_violin_plot.pdf"), g, width = 5, height = 4)
 }
@@ -134,7 +134,7 @@ for(stage in stages){
 ```
 ```{r fig.height=5, fig.width=10}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="promoter.mean", plot = "violin")
+  g <- plot_stage_dynamics(chip_dfs, dyns=rna_dyns_timing, cols=cols_rna_timing, timepoint=stage, type="promoter.enrich", plot = "violin")
   grid.arrange(g)
   ggsave(file=paste0("output/rna_chip/", stage, "_rna_timing_violin_plot.pdf"), g, width = 5, height = 4)
 }

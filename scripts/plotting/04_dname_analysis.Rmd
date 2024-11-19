@@ -50,10 +50,12 @@ rm(Xenla10.1_TxDb)
 
 ## DNAme dynamics
 ```{r}
-DNAme_dfs[["ZGA"]] <- DNAme_dfs[["Pre-ZGA"]]
+#DNAme_dfs[["ZGA"]] <- DNAme_dfs[["Pre-ZGA"]]
 
-dname_groups <- list(Kept = "Y_Y_Y_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N") #Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"),
-dname_names_complete <- c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N", "Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N", "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N", "N_N_Y_Y", "N_N_Y_N", "N_N_N_Y", "N_N_N_N")
+dname_groups <- list(Kept = "Y_Y_Y", Lost=c("Y_Y_N", "Y_N_N"), Gained=c("N_N_Y"), Absent="N_N_N")
+dname_names_complete <- c("Y_Y_Y", "Y_Y_N", "Y_N_Y", "Y_N_N", "N_Y_Y", "N_Y_N", "N_N_Y", "N_N_N")
+#dname_groups <- list(Kept = "Y_Y_Y_Y", Lost=c("Y_Y_Y_N", "Y_Y_N_N", "Y_N_N_N"), Gained=c("N_N_Y_Y", "N_N_N_Y"), Absent="N_N_N_N") #Recovered=c("Y_Y_N_Y", "Y_N_Y_Y", "Y_N_N_Y"),
+#dname_names_complete <- c("Y_Y_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_Y_N_N", "Y_N_Y_Y", "Y_N_Y_N", "Y_N_N_Y", "Y_N_N_N", "N_Y_Y_Y", "N_Y_Y_N", "N_Y_N_Y", "N_Y_N_N", "N_N_Y_Y", "N_N_Y_N", "N_N_N_Y", "N_N_N_N")
 dname_groups_complete <- setNames(as.list(dname_names_complete), dname_names_complete)
 peak_combinations <- compute_peak_combinations(DNAme_dfs)
 
@@ -80,21 +82,32 @@ for(i in 1:length(groups)){
     euler_cols[dynamic]=cols[names(groups)[i]]
   }
 }
-plot(euler(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
-           "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
-           "Sperm&Pre-ZGA"=length(N_Y_Y_N), "Sperm&ZGA"=length(N_Y_N_Y), "Pre-ZGA&ZGA"=length(N_N_Y_Y),
-      "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
-      "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
-     quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
+plot(euler(c("Spermatid"=length(Y_N_N), "Sperm"=length(N_Y_N), "Pre-ZGA"=length(N_N_Y),
+           "Spermatid&Sperm"=length(Y_Y_N), "Spermatid&Pre-ZGA"=length(Y_N_Y),
+           "Sperm&Pre-ZGA"=length(N_Y_Y), "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y))),
+     quantities = TRUE,  fills=euler_cols[c("Y_N_N", "N_Y_N", "N_N_Y", "Y_Y_N", "Y_N_Y", "N_Y_Y", "Y_Y_Y")])
 
 plot_venn <- function() {
-  plot(venn(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
-             "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
-             "Sperm&Pre-ZGA"=length(N_Y_Y_N), "Sperm&ZGA"=length(N_Y_N_Y), "Pre-ZGA&ZGA"=length(N_N_Y_Y),
-        "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
-        "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
-       quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
+  plot(venn(c("Spermatid"=length(Y_N_N), "Sperm"=length(N_Y_N), "Pre-ZGA"=length(N_N_Y),
+             "Spermatid&Sperm"=length(Y_Y_N), "Spermatid&Pre-ZGA"=length(Y_N_Y),
+             "Sperm&Pre-ZGA"=length(N_Y_Y), "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y))),
+       quantities = TRUE,  fills=euler_cols[c("Y_N_N", "N_Y_N", "N_N_Y", "Y_Y_N", "Y_N_Y", "N_Y_Y", "Y_Y_Y")])
 }
+# plot(euler(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
+#            "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
+#            "Sperm&Pre-ZGA"=length(N_Y_Y_N), "Sperm&ZGA"=length(N_Y_N_Y), "Pre-ZGA&ZGA"=length(N_N_Y_Y),
+#       "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
+#       "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
+#      quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
+
+# plot_venn <- function() {
+#   plot(venn(c("Spermatid"=length(Y_N_N_N), "Sperm"=length(N_Y_N_N), "Pre-ZGA"=length(N_N_Y_N), "ZGA"=length(N_N_N_Y),
+#              "Spermatid&Sperm"=length(Y_Y_N_N), "Spermatid&Pre-ZGA"=length(Y_N_Y_N), "Spermatid&ZGA"=length(Y_N_N_Y),
+#              "Sperm&Pre-ZGA"=length(N_Y_Y_N), "Sperm&ZGA"=length(N_Y_N_Y), "Pre-ZGA&ZGA"=length(N_N_Y_Y),
+#         "Spermatid&Sperm&Pre-ZGA"=length(Y_Y_Y_N), "Spermatid&Sperm&ZGA"=length(Y_Y_N_Y), "Spermatid&Pre-ZGA&ZGA"=length(Y_N_Y_Y),
+#         "Sperm&Pre-ZGA&ZGA"=length(N_Y_Y_Y), "Spermatid&Sperm&Pre-ZGA&ZGA"=length(Y_Y_Y_Y))),
+#        quantities = TRUE,  fills=euler_cols[c("Y_N_N_N", "N_Y_N_N", "N_N_Y_N", "N_N_N_Y", "Y_Y_N_N", "Y_N_Y_N", "Y_N_N_Y", "N_Y_Y_N", "N_Y_N_Y", "N_N_Y_Y", "Y_Y_Y_N", "Y_Y_N_Y", "Y_N_Y_Y", "N_Y_Y_Y", "Y_Y_Y_Y")])
+# }
 
 pdf(file="output/dname/dname_dynamics_venn.pdf", width=5, height=5)
 plot_venn()
@@ -126,28 +139,28 @@ plot_alluvial <- function(remove_NNNN, remove_YYYY, equal_scale){
     plot_df = rbind(plot_df, row)
   }
   
-  colnames(plot_df) <- c(stages, "Freq", "Dynamic")
+  colnames(plot_df) <- c(stages[1:3], "Freq", "Dynamic")
   plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
   
-  if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
-  if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
+  if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N"),]}
+  if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y"),]}
   
-  plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_N_Y_N", "N_Y_N_Y"),]
+  plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_N_Y", "N_Y_N"),]
   
-  for(stage in stages){
+  for(stage in stages[1:3]){
     plot_df[,stage] <- factor(plot_df[,stage], levels=c("Y", "N"))
   }
   if(equal_scale){
     plot_df$Freq <- 1
   }else{
-    plot_df <- plot_df[!plot_df$Dynamic %in% c("N_Y_N_N", "N_Y_N_Y", "N_Y_Y_Y", "N_Y_Y_N", "Y_N_Y_N", "N_N_Y_N"),]
+    plot_df <- plot_df[!plot_df$Dynamic %in% c("N_Y_N", "Y_N_Y"),]
   }
   alluvial_plot <- ggplot(plot_df,
-         aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
+         aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, fill=Dynamic)) +
     geom_alluvium(aes(fill = Dynamic), width = 1/12, lode.guidance="backfront") + theme_pubr() +
     geom_stratum(width = 1/12, alpha = .75) +
     geom_label(stat = "stratum", aes(label = after_stat(stratum)), fill="white") +
-    scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
+    scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA"), expand = c(.05, .05)) +
     scale_fill_manual(values=euler_cols) + 
     guides(fill="none") 
   if(equal_scale){
@@ -158,6 +171,50 @@ plot_alluvial <- function(remove_NNNN, remove_YYYY, equal_scale){
   }
   plot(alluvial_plot)
 }
+
+# plot_alluvial <- function(remove_NNNN, remove_YYYY, equal_scale){
+#   get_row <- function(dyns){
+#     levels = unlist(strsplit(names(dyns), split = "_"))
+#     return(c(levels, length(dyns[[1]]), names(dyns)))
+#   }
+#   plot_df = data.frame()
+#   for (i in 1:length(dname_dyns_complete)){
+#     row = get_row(dname_dyns_complete[i])
+#     plot_df = rbind(plot_df, row)
+#   }
+  
+#   colnames(plot_df) <- c(stages, "Freq", "Dynamic")
+#   plot_df <- plot_df %>% mutate_at("Freq", as.numeric)
+  
+#   if(remove_NNNN){plot_df <- plot_df[!plot_df$Dynamic %in% c("N_N_N_N"),]}
+#   if(remove_YYYY){plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_Y_Y_Y"),]}
+  
+#   plot_df <- plot_df[!plot_df$Dynamic %in% c("Y_N_Y_N", "N_Y_N_Y"),]
+  
+#   for(stage in stages){
+#     plot_df[,stage] <- factor(plot_df[,stage], levels=c("Y", "N"))
+#   }
+#   if(equal_scale){
+#     plot_df$Freq <- 1
+#   }else{
+#     plot_df <- plot_df[!plot_df$Dynamic %in% c("N_Y_N_N", "N_Y_N_Y", "N_Y_Y_Y", "N_Y_Y_N", "Y_N_Y_N", "N_N_Y_N"),]
+#   }
+#   alluvial_plot <- ggplot(plot_df,
+#          aes(y = Freq, axis1 = Spermatid, axis2 = Sperm, axis3= `Pre-ZGA`, axis4 = ZGA, fill=Dynamic)) +
+#     geom_alluvium(aes(fill = Dynamic), width = 1/12, lode.guidance="backfront") + theme_pubr() +
+#     geom_stratum(width = 1/12, alpha = .75) +
+#     geom_label(stat = "stratum", aes(label = after_stat(stratum)), fill="white") +
+#     scale_x_discrete(limits = c("Spermatid", "Sperm", "Pre-ZGA", "ZGA"), expand = c(.05, .05)) +
+#     scale_fill_manual(values=euler_cols) + 
+#     guides(fill="none") 
+#   if(equal_scale){
+#     alluvial_plot <- alluvial_plot + geom_hline(yintercept = 1/2*sum(plot_df$Freq), col = "black", linetype="dotted") +
+#     theme(axis.title.y=element_blank(),
+#         axis.text.y=element_blank(),
+#         axis.ticks.y=element_blank())
+#   }
+#   plot(alluvial_plot)
+# }
 
 pdf(file="output/dname/dname_dynamics_alluvial_full.pdf", width=5, height=3)
 plot_alluvial(remove_NNNN = FALSE, remove_YYYY = FALSE, equal_scale=FALSE)

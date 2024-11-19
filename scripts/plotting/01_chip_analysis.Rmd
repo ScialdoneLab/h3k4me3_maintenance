@@ -81,13 +81,13 @@ chip_dyns_complete_sizes = unlist(lapply(chip_dyns_complete, function(x) length(
 ```
 
 ## Save data
-```{r eval = FALSE}
-response <- readline("Do you want to save the dynamics? (yes/no): ")
-if (tolower(response) == "yes") {
-  save(chip_dyns, chip_dyns_detail, chip_dyns_removed, file="data/processed/chip_dynamics.RData")
-} else {
-  print("Dynamics not saved")
-}
+```{r eval = TRUE}
+#response <- readline("Do you want to save the dynamics? (yes/no): ")
+#if (tolower(response) == "yes") {
+save(chip_dyns, chip_dyns_detail, chip_dyns_removed, file="data/processed/chip_dynamics.RData")
+#} else {
+#  print("Dynamics not saved")
+#}
 ```
 
 ## Plot legend
@@ -229,11 +229,11 @@ for(stage in stages){
 ## Violin plots
 ```{r}
 for(stage in stages){
-  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.mean", plot = "violin")
+  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.enrich", plot = "violin")
   grid.arrange(g)
   ggsave(file=paste0("output/chip/", stage, "_violin_plot.pdf"), g, width = 5, height = 4)
 
-  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.mean", plot = "ecdf")
+  g <- plot_stage_dynamics(chip_dfs, dyns=chip_dyns, cols=cols_chip, timepoint=stage, type="promoter.enrich", plot = "ecdf")
   grid.arrange(g)
   ggsave(file=paste0("output/chip/", stage, "_ecdf_plot.pdf"), g, width = 5, height = 4)
 }
@@ -253,7 +253,7 @@ for(stage in stages){
 dyns = c(chip_dyns_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")])#, chip_dyns["Recovered"])
 cols = c(cols_chip_detail[c("Kept", "Lost@ZGA", "Lost@Pre-ZGA", "Lost@Sperm")])#, cols_chip["Recovered"])
 
-g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="promoter.mean", plot="violin")
+g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="Spermatid", type="promoter.enrich", plot="violin")
 grid.arrange(g)
 ggsave(file=paste0("output/chip/Spermatid_violin_plot_detail.pdf"), g, width = 5, height = 4)
 
@@ -265,7 +265,7 @@ ggsave(file=paste0("output/chip/Spermatid_violin_plot_width_detail.pdf"), g, wid
 dyns = c(chip_dyns_detail[c("Kept", "GainedEarly", "GainedLate")])#, chip_dyns["Recovered"])
 cols = c(cols_chip_detail[c("Kept", "GainedEarly", "GainedLate")])#, cols_chip["Recovered"])
 
-g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="promoter.mean", plot = "violin")
+g <- plot_stage_dynamics(chip_dfs, dyns=dyns, cols=cols, timepoint="ZGA", type="promoter.enrich", plot = "violin")
 grid.arrange(g)
 ggsave(file=paste0("output/chip/ZGA_violin_plot_detail.pdf"), g, width = 5, height = 4)
 
@@ -331,7 +331,7 @@ transition_diff <- function(transition, type){
 transitions <- list(c("Spermatid", "Sperm"), c("Sperm", "Pre-ZGA"), c("Pre-ZGA", "ZGA"), c("Spermatid", "ZGA"))
 res_width <- lapply(transitions, transition_diff, type="peak.width")
 #res_enrich <- lapply(transitions, transition_diff, type="promoter.enrich")
-res_mean <- lapply(transitions, transition_diff, type="promoter.mean")
+res_mean <- lapply(transitions, transition_diff, type="promoter.enrich")
 #res_max <- lapply(transitions, transition_diff, type="promoter.max")
 
 grid.arrange(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]], 
@@ -345,7 +345,7 @@ grid.arrange(res_width[[1]], res_width[[2]], res_width[[3]], res_width[[4]],
 ```{r message=FALSE, warning=FALSE}
 corr_plot <- function(stage){
   plot_df <- chip_dfs[[stage]]
-  plot_df <- plot_df[plot_df$peak,c("peak.width", "promoter.enrich", "promoter.max", "promoter.mean")]
+  plot_df <- plot_df[plot_df$peak,c("peak.width", "promoter.enrich", "promoter.max", "promoter.enrich")]
   chart.Correlation(plot_df, histogram = TRUE, method = "spearman")
   mtext(paste(stage), side=3, line=3)
 }

@@ -26,220 +26,60 @@ mapnames <- se_1_2@elementMetadata@listData$name
 names(mapnames) <- se_1_2@elementMetadata@listData$id
 ```
 
+## Preprocessing
 ```{r}
 remove_sustained <- FALSE
-if (remove_sustained) {
-    se_1_2 <- se_1_2[, !grepl("-IAA", se_1_2@colData@listData$condition)]
-    se_3_4 <- se_3_4[, !grepl("-IAA", se_3_4@colData@listData$condition)]
+timepoints_unified <- c("T1" = "256c+1hr", "T2" = "256c+2hr", "T3" = "256c+3hr")
+
+preprocess_se <- function(se) {
+    se <- se[, !grepl("Wt", se@colData@listData$condition)]
+    se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
+    if (remove_sustained) {
+        se <- se[, !grepl("-IAA", se@colData@listData$condition)]
+    }
+    se@colData@listData$group <-
+        sapply(se@colData@listData$FID_comment, function(x) {
+            parts <- unlist(strsplit(x, " "))
+            condition <- gsub(" ", "", paste(parts[1:(grep("IAA", parts))], collapse = " "))
+            timepoint <- timepoints_unified[grep("T[1-3]", parts, value = TRUE)]
+            replicate <- grep("\\b[1-4]\\.[1-3]\\b", parts, value = TRUE)
+            paste0(condition, " ", timepoint, " Rep ", replicate)
+        })
+
+    return(se)
+}
+
+se_1_2 <- preprocess_se(se_1_2)
+se_3_4 <- preprocess_se(se_3_4)
+
+controls <- c("Control-IAA" = "Control-IAA", "Control+IAA" = "Control+IAA", "Treated-IAA" = "Control-IAA", "Treated+IAA" = "Control+IAA")
+de_filename <- function(dir, rep, timepoint, condition) {
+    paste0(dir, "res_", rep, "_", timepoint, "_Treated_", condition, "_", timepoint, "_vs_Control_", condition, "_", timepoint, ".rds")
 }
 ```
 
-
-```{r}
-plot_auxin <- function(rep, control, zygotic_only, plot = "heatmap", dynamic = NULL, tp = NULL, only_de=FALSE, hm_rows="chip_dyns") {
-    if (zygotic_only) {
-        se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
-    }
-    if(!is.null(dynamic)){
-        se <- se[mapnames[rownames(se)] %in% chip_dyns[[dynamic]], ]
-    }
-    se <- se[, se@colData@listData$experiment_set == rep]
-
-    tpms <- se@assays@data@listData$tpms
-    tpms <- tpms[!(mapnames[rownames(tpms)] %in% names(table(mapnames)[table(mapnames) > 1])), ]
-    tpms <- tpms[complete.cases(tpms), ]
-
-    reps <- se@colData@listData$experiment_set
-    technical_reps <- se@colData@listData$replicate_number
-    timepoints <- se@colData@listData$time_point
-    conditions <- se@colData@listData$condition
-
-    tpms_ctrl_normalize <- function(sample_idx, pseudocount = 1) {
-        timepoint <- timepoints[sample_idx]
-        mean_ctrl <- rowMeans(tpms[, timepoints == timepoint & conditions == control[se@colData@listData$condition[sample_idx]]])
-        return((tpms[, sample_idx] + pseudocount) / (mean_ctrl + pseudocount))
-    }
-
-    tpms_norm <- as.data.frame(sapply(1:ncol(tpms), tpms_ctrl_normalize))
-    rownames(tpms_norm) <- mapnames[rownames(tpms_norm)]
-    colnames(tpms_norm) <- se@colData@listData$FID_comment
-    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
-
-    if (plot == "violin") {
-        tpms_norm <- tpms_norm[, reps == rep & timepoints == names(table(timepoints))[tp] & !(conditions %in% c("Wt-IAA", "Wt -IAA"))]
-        tpms_norm$genes <- rownames(tpms_norm)
-        tpms_norm <- melt(tpms_norm, variable.name = "condition", value.name = "value", na.rm = TRUE)
-        tpms_norm$condition <- sub("\\.[123]", "", tpms_norm$condition)
-        tpms_norm$dyn <- sapply(tpms_norm$genes, label_dyn, dyns = chip_dyns)
-        tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
-
-        minus_ctrl <- names(table(tpms_norm$condition))[grep("Control -IAA|Control-IAA", names(table(tpms_norm$condition)))]
-        plus_ctrl <- names(table(tpms_norm$condition))[grep("Control \\+IAA|Control\\+IAA", names(table(tpms_norm$condition)))]
-        minus_treated <- names(table(tpms_norm$condition))[grep("Treated -IAA|Treated-IAA", names(table(tpms_norm$condition)))]
-        plus_treated <- names(table(tpms_norm$condition))[grep("Treated \\+IAA|Treated\\+IAA", names(table(tpms_norm$condition)))]
-        if (remove_sustained) {
-            comparisons <- list(c(plus_treated, plus_ctrl))
-            cols <- setNames(c("#54868B", "#8C3F30"), c(plus_ctrl, plus_treated))
-        } else {
-            cols <- setNames(c("#7BC5CD", "#54868B", "#CE5C46", "#8C3F30"), c(minus_ctrl, plus_ctrl, minus_treated, plus_treated))
-            comparisons <- list(c(minus_treated, minus_ctrl), c(plus_treated, plus_ctrl))
-        }
-
-        ggviolin(tpms_norm, x = "condition", y = "value", fill = "condition", add = "boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) +
-            labs(y = "fold change", x = NULL, title = paste(dynamic, "& Zygotic (", names(table(timepoints))[tp], ")")) +
-            theme_pubr() +
-            theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-            scale_x_discrete(limits = c(minus_ctrl, plus_ctrl, minus_treated, plus_treated), labels = function(x) sub("(IAA).*", "\\1", x)) +
-            scale_fill_manual(values = cols) +
-            stat_compare_means(
-                comparisons = comparisons,
-                method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"),
-                label.y = c(1.9, 2.2)
-            ) +
-            geom_hline(yintercept = 1, linetype = "dotted") +
-            coord_cartesian(ylim = c(0, 2.5))
-    } else {
-        de_timepoints <- c("T1", "T2", "T3")
-        de_conditions <- c("mIAA", "pIAA")
-        files <- expand.grid(timepoint = de_timepoints, condition = de_conditions)
-
-        read_de_res <- function(idx, direction) {
-            timepoint <- files[idx, "timepoint"]
-            condition <- files[idx, "condition"]
-            rds <- readRDS(paste0(auxin_dir, "res_", rep, "_", timepoint, "_Treated_", condition, "_", timepoint, "_vs_Control_", condition, "_", timepoint, ".rds"))
-            rds <- na.omit(rds, cols = c("padj", "log2FoldChange"))
-            if (direction == "up") {
-                res <- rownames(rds[rds$padj < 0.05 & rds$log2FoldChange > 0, ])
-                return(mapnames[intersect(res, rownames(tpms))])
-            } else if (direction == "down") {
-                res <- rownames(rds[rds$padj < 0.05 & rds$log2FoldChange < 0, ])
-                return(mapnames[intersect(res, rownames(tpms))])
-            }
-        }
-
-        up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up")))
-        down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down")))
-        de_list <- list("up" = up_list, "down" = down_list, "no change" = setdiff(rownames(tpms_norm), union(up_list, down_list)))
-
-        if (only_de) {
-            tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(up_list, down_list), ]
-        }
-
-        down_minus_6hpf <- read_de_res(idx = 1, direction = "down")
-        down_minus_7hpf <- read_de_res(idx = 2, direction = "down")
-        down_minus_8hpf <- read_de_res(idx = 3, direction = "down")
-        down_plus_6hpf <- read_de_res(idx = 4, direction = "down")
-        down_plus_7hpf <- read_de_res(idx = 5, direction = "down")
-        down_plus_8hpf <- read_de_res(idx = 6, direction = "down")
-        overlap_dyns <- list(
-            "T1" = list("only persistant" = setdiff(down_minus_6hpf, down_plus_6hpf), "both conditions" = intersect(down_minus_6hpf, down_plus_6hpf), "only window" = setdiff(down_plus_6hpf, down_minus_6hpf)),
-            "T2" = list("only persistant" = setdiff(down_minus_7hpf, down_plus_7hpf), "both conditions" = intersect(down_minus_7hpf, down_plus_7hpf), "only window" = setdiff(down_plus_7hpf, down_minus_7hpf)),
-            "T3" = list("only persistant" = setdiff(down_minus_8hpf, down_plus_8hpf), "both conditions" = intersect(down_minus_8hpf, down_plus_8hpf), "only window" = setdiff(down_plus_8hpf, down_minus_8hpf))
-        )
-
-        if (plot == "balloon") {
-            names(de_chip_dyns) <- paste(names(de_chip_dyns), "Zygotic")
-            return(plot_balloonplot(x_dyns = de_chip_dyns, y_dyns = overlap_dyns[[tp]], limit = 200, x_caption = "H3K4me3", y_caption = "Downregulated genes"))
-        } else {
-            timepoints_rep12 <- c("T1" = "T1 256c + 1hr", "T2" = "T2 256c + 2hr", "T3" = "T3 256c + 3hr")
-            timepoints_str <- names(table(timepoints))
-            if (rep %in% c(1, 2)) {
-                timepoints_str <- timepoints_rep12[timepoints_str]
-                conditions_order <- c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA")
-            } else {
-                conditions_order <- c("Control-IAA", "Control+IAA", "Treated-IAA", "Treated+IAA")
-            }
-            if(remove_sustained){
-                conditions_order <- conditions_order[c(2, 4)]
-            }
-            column_order <- rbind(expand.grid(tech_rep = c(1, 2, 3), timepoint = timepoints_str, condition = conditions_order))
-
-            str_column_order <- paste(
-                column_order$condition,
-                paste0(rep, ".", column_order$tech_rep),
-                column_order$timepoint
-            )
-
-            tpms_norm <- tpms_norm[, str_column_order] # sample(1:nrow(tpms_norm), 1000)
-            tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
-
-            if (rep %in% c(1, 2)) {
-                colnames(tpms_norm) <- sub(" 256c \\+ [1-3]hr$", "", colnames(tpms_norm))
-            }
-
-            if (hm_rows == "chip_dyns") {
-                row_slices <- chip_dyns[names(chip_dyns) %in% c("Kept", "Gained", "Absent")]
-                tpms_norm <- tpms_norm[rownames(tpms_norm) %in% unlist(row_slices), ]
-                row_split <- factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = row_slices), "& Zygotic"), levels = c("Gained & Zygotic", "Kept & Zygotic", "Absent & Zygotic"))
-            } else if (hm_rows == "de") {
-                row_slices <- de_list
-                tpms_norm <- tpms_norm[rownames(tpms_norm) %in% unlist(row_slices), ]
-                row_split <- factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = row_slices), "& Zygotic"), levels = c("up & Zygotic", "down & Zygotic", "no change & Zygotic"))
-            }
-
-            col_fun <- colorRamp2(c(0, 1, 2), c("blue", "white", "red"))
-            hm <- Heatmap(tpms_norm,
-                use_raster = TRUE,
-                col = col_fun,
-                name = "fold change",
-                column_split = column_order$condition,
-                cluster_columns = FALSE,
-                cluster_column_slices = FALSE,
-                cluster_row_slices = FALSE,
-                row_split = row_split,
-                show_row_names = FALSE,
-                show_row_dend = FALSE,
-                row_title_rot = 0
-            )
-
-            tpms_norm$rna_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = rna_dyns)
-            hm_rna <- Heatmap(tpms_norm$rna_dyn,
-                use_raster = TRUE,
-                name = "RNA dynamic",
-                col = cols_rna,
-            )
-
-            tpms_norm$chip_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = chip_dyns)
-            hm_chip <- Heatmap(tpms_norm$chip_dyn,
-                use_raster = TRUE,
-                name = "H3K4me3 dynamic",
-                col = cols_chip,
-            )
-
-            tpms_norm$de_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = de_list)
-            tpms_norm$de_dyn[is.na(tpms_norm$de_dyn)] <- "no change"
-            hm_de <- Heatmap(tpms_norm$de_dyn,
-                use_raster = TRUE,
-                name = "Differential expression",
-                col = c("down" = "#2A2D7C", "up" = "#CD2027", "no change" = "#BFBEBE"),
-            )
-
-            if (hm_rows == "chip_dyns") {
-                hm <- hm + hm_de + hm_rna
-            } else if (hm_rows == "de") {
-                hm <- hm + hm_chip + hm_rna
-            }
-            return(hm)
-        }
-    }
-}
-```
-
-## Violin comparision of fold change
-```{r}
-zygotic_only <- TRUE
-
-for (rep in c(2, 3)) {
+## Violin comparison of fold change
+```{r warning=FALSE}
+for (rep in 2:3) {
     if (rep %in% c(1, 2)) {
         se <- se_1_2
-        control <- c("Control -IAA" = "Control -IAA", "Control +IAA" = "Control +IAA", "Treated -IAA" = "Control -IAA", "Treated +IAA" = "Control +IAA", "Wt -IAA" = "Wt -IAA")
     } else {
         se <- se_3_4
-        control <- c("Control-IAA" = "Control-IAA", "Control+IAA" = "Control+IAA", "Treated-IAA" = "Control-IAA", "Treated+IAA" = "Control+IAA", "Wt-IAA" = "Wt-IAA")
     }
+    se_rep <- se[, se@colData@listData$experiment_set == rep]
+    tpms_norm <- normalize_tpms(se_rep, controls)
     for (dyn in c("Kept", "Gained")) {
+        tpms_norm_dyn <- subset_dynamics(tpms_norm, dyn)
         for (tp in 1:3) {
-            plot_auxin(rep, control, zygotic_only, plot = "violin", dynamic = dyn, tp = tp)
+            tpms_norm_dyn_tp <- subset_tp(tpms_norm_dyn, tp)
+            violin <- plot_violin(tpms_norm_dyn_tp,
+                cols = c("#7BC5CD", "#54868B", "#CE5C46", "#8C3F30"),
+                order = c("Control-IAA", "Control+IAA", "Treated-IAA", "Treated+IAA"),
+                comparisons = list(c("Treated-IAA", "Control-IAA"), c("Treated+IAA", "Control+IAA")),
+                y_max = 2.5,
+                title = paste0(dyn, " & Zygotic (T", tp, ")")
+            )
+            plot(violin)
             ggsave(paste0("output/auxin/violin_zygotic_rep", rep, "_", dyn, "_t", tp, ".pdf"), width = 5, height = 4)
         }
     }
@@ -247,40 +87,111 @@ for (rep in c(2, 3)) {
 ```
 
 ## Heatmaps of fold change
-```{r}
-zygotic_only <- TRUE
-
-for (rep in c(2, 3)) {
+```{r warning=FALSE}
+for (rep in 2:3) {
     if (rep %in% c(1, 2)) {
         se <- se_1_2
-        control <- c("Control -IAA" = "Control -IAA", "Control +IAA" = "Control +IAA", "Treated -IAA" = "Control -IAA", "Treated +IAA" = "Control +IAA", "Wt -IAA" = "Wt -IAA")
     } else {
         se <- se_3_4
-        control <- c("Control-IAA" = "Control-IAA", "Control+IAA" = "Control+IAA", "Treated-IAA" = "Control-IAA", "Treated+IAA" = "Control+IAA", "Wt-IAA" = "Wt-IAA")
     }
-    hm <- plot_auxin(rep, control, zygotic_only, plot = "heatmap")
+    se_rep <- se[, se@colData@listData$experiment_set == rep]
+    tpms_norm <- normalize_tpms(se_rep, controls)
+
+    hm <- plot_heatmap(tpms_norm,
+        order = c("Control-IAA", "Control+IAA", "Treated-IAA", "Treated+IAA"),
+        hm_rows = "chip_dyns",
+        de_list = get_de_list(auxin_dir, rep,
+            de_timepoints <- c("T1", "T2", "T3"),
+            de_conditions <- c("mIAA", "pIAA"),
+            background = rownames(tpms_norm)
+        ),
+        only_de = FALSE
+    )
+    draw(hm)
+
     pdf(paste0("output/auxin/heatmap_zygotic_rep", rep, ".pdf"), width = 10, height = 5)
     draw(hm)
     dev.off()
-    draw(hm)
 }
 ```
 
-## Balloon plots
-```{r}
-zygotic_only <- TRUE
+## Balloon plots of zygotic genes
+```{r warning=FALSE}
+tps <- c("T1", "T2", "T3")
+conditions <- c("mIAA", "pIAA")
 
-for (rep in c(2, 3)) {
-    if (rep %in% c(1, 2)) {
-        se <- se_1_2
-        control <- c("Control -IAA" = "Control -IAA", "Control +IAA" = "Control +IAA", "Treated -IAA" = "Control -IAA", "Treated +IAA" = "Control +IAA", "Wt -IAA" = "Wt -IAA")
-    } else {
-        se <- se_3_4
-        control <- c("Control-IAA" = "Control-IAA", "Control+IAA" = "Control+IAA", "Treated-IAA" = "Control-IAA", "Treated+IAA" = "Control+IAA", "Wt-IAA" = "Wt-IAA")
+for (rep in 2:3) {
+    for (tp in tps) {
+        for (dyns in c("detail", "rna_timing")) {
+            for (condition in conditions) {
+                de_list <- get_de_list(auxin_dir, rep,
+                    de_timepoints <- tp,
+                    de_conditions <- condition,
+                    background = unique(unlist(chip_dyns))
+                )
+                if (dyns == "chip") {
+                    comp_dyns <- lapply(chip_dyns[names(chip_dyns) %in% c("Kept", "Gained", "Absent")], function(x) intersect(x, c(rna_dyns$GZ, rna_dyns$ZS)))
+                    names(comp_dyns) <- paste(names(comp_dyns), "& Zygotic")
+                } else if (dyns == "rna") {
+                    comp_dyns <- rna_dyns[names(rna_dyns) %in% c("GZ", "ZS")]
+                } else if (dyns == "detail") {
+                    comp_dyns <- list()
+                    for (chip_dyn in c("Kept", "Gained", "Absent")) {
+                        for (rna_dyn in c("GZ", "ZS")) {
+                            intersection_name <- paste(chip_dyn, rna_dyn, sep = " & ")
+                            comp_dyns[[intersection_name]] <- intersect(chip_dyns[[chip_dyn]], rna_dyns[[rna_dyn]])
+                        }
+                    }
+                } else if (dyns == "rna_timing") {
+                    comp_dyns <- rna_dyns_timing
+                }
+
+                plot_balloonplot(x_dyns = comp_dyns, y_dyns = de_list, limit = 200, x_caption = paste(dyns, "dynamics"), y_caption = "RNA expression")
+                ggsave(paste0("output/auxin/balloon_plot_zygotic_rep", rep, "_", dyns, "_", tp, "_", condition, ".pdf"), width = 4, height = 4)
+            }
+        }
     }
-    for (tp in 1:3) {
-        plot <- plot_auxin(rep, control, zygotic_only, plot = "balloon", tp = tp)
-        plot(plot)
+}
+```
+
+## Balloon plots of downregulated genes
+```{r warning=FALSE}
+de_timepoints <- c("T1", "T2", "T3")
+de_conditions <- c("mIAA", "pIAA")
+files <- expand.grid(timepoint = de_timepoints, condition = de_conditions)
+
+for (rep in 2:3) {
+    down_lists <- lapply(1:nrow(files), read_de_res, direction = "down", files = files, dir = auxin_dir, rep = rep)
+    names(down_lists) <- paste(files$condition, files$timepoint)
+
+    overlap_dyns <- list(
+        "T1" = list("only persistant" = setdiff(down_lists[["mIAA T1"]], down_lists[["pIAA T1"]]), "both conditions" = intersect(down_lists[["mIAA T1"]], down_lists[["pIAA T1"]]), "only window" = setdiff(down_lists[["pIAA T1"]], down_lists[["mIAA T1"]])),
+        "T2" = list("only persistant" = setdiff(down_lists[["mIAA T2"]], down_lists[["pIAA T2"]]), "both conditions" = intersect(down_lists[["mIAA T2"]], down_lists[["pIAA T2"]]), "only window" = setdiff(down_lists[["pIAA T2"]], down_lists[["mIAA T2"]])),
+        "T3" = list("only persistant" = setdiff(down_lists[["mIAA T3"]], down_lists[["pIAA T3"]]), "both conditions" = intersect(down_lists[["mIAA T3"]], down_lists[["pIAA T3"]]), "only window" = setdiff(down_lists[["pIAA T3"]], down_lists[["mIAA T3"]]))
+    )
+
+    for (tp in c("T1", "T2", "T3")) {
+        for (dyns in c("detail", "rna_timing")) {
+            if (dyns == "chip") {
+                comp_dyns <- lapply(chip_dyns[names(chip_dyns) %in% c("Kept", "Gained", "Absent")], function(x) intersect(x, c(rna_dyns$GZ, rna_dyns$ZS)))
+                names(comp_dyns) <- paste(names(comp_dyns), "& Zygotic")
+            } else if (dyns == "rna") {
+                comp_dyns <- rna_dyns[names(rna_dyns) %in% c("GZ", "ZS")]
+            } else if (dyns == "detail") {
+                comp_dyns <- list()
+                for (chip_dyn in c("Kept", "Gained", "Absent")) {
+                    for (rna_dyn in c("GZ", "ZS")) {
+                        intersection_name <- paste(chip_dyn, rna_dyn, sep = " & ")
+                        comp_dyns[[intersection_name]] <- intersect(chip_dyns[[chip_dyn]], rna_dyns[[rna_dyn]])
+                    }
+                }
+            } else if (dyns == "rna_timing") {
+                comp_dyns <- rna_dyns_timing
+            }
+
+            plot_balloonplot(x_dyns = comp_dyns, y_dyns = overlap_dyns[[tp]], limit = 200, x_caption = paste(dyns, "dynamics"), y_caption = "Downregulated genes")
+            ggsave(paste0("output/auxin/balloon_plot_down_rep", rep, "_", dyns, "_", tp, ".pdf"), width = 4, height = 4)
+        }
     }
 }
 ```

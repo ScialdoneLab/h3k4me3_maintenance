@@ -1,5 +1,5 @@
 # axis
-axis_titles <- list("peak.width" = "H3K4me3 peak breadth", "promoter.mean" = "H3K4me3 enrichment", "X9hpf" = "RNA expression at 9hpf [log2]", "expression.6hpf" = "RNA expression at 6hpf [log]", "expression.7hpf" = "RNA expression at 7hpf [log]", "expression.8hpf" = "RNA expression at 8hpf [log]", "expression.9hpf" = "RNA expression at 9hpf [log]", "cg.density" = "CG density", "promoter.dna.methyl" = "DNA methylation enrichment", "promoter.accessibility" = "Accessibility enrichment", "expression" = "RNA expression")
+axis_titles <- list("peak.width" = "H3K4me3 peak breadth", "promoter.enrich" = "H3K4me3 enrichment", "X9hpf" = "RNA expression at 9hpf [log2]", "expression.6hpf" = "RNA expression at 6hpf [log]", "expression.7hpf" = "RNA expression at 7hpf [log]", "expression.8hpf" = "RNA expression at 8hpf [log]", "expression.9hpf" = "RNA expression at 9hpf [log]", "cg.density" = "CG density", "promoter.dna.methyl" = "DNA methylation enrichment", "promoter.accessibility" = "Accessibility enrichment", "expression" = "RNA expression")
 
 # colors
 cols_chip <- setNames(c("#DDAA33", "#BB5566", "#004488", "#DDDDDD"), c("Kept", "Lost", "Gained", "Absent")) #Recovered="#228833"

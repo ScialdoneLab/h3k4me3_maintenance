@@ -95,13 +95,13 @@ plot_peak <- function(data, stage, dyns, cols, onlypeaks = FALSE, remove_NA = TR
     add = "mean_se", conf.int = TRUE, color = "dynamics"
   ) + scale_color_manual(values = cols) + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) + ggtitle(stage) + guides(color = "none")
   if (label == "DNAme") {
-    plot <- plot + labs(y = expression(Mean ~ DNAme ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ DNAme ~ intensity ~ "[log"[2] * "]"), x = "+/-1kb of TSS")
   } else if (label == "H3K4me3") {
-    plot <- plot + labs(y = expression(Mean ~ H3K4me3 ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ H3K4me3 ~ intensity ~ "[log"[2] * "]"), x = "+/-1kb of TSS")
   } else if (label == "DamID") {
-    plot <- plot + labs(y = expression(Mean ~ DamID ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ DamID ~ intensity ~ "[log"[2] * "]"), x = "+/-1kb of TSS")
   } else {
-    plot <- plot + labs(y = expression(Mean ~ intensity ~ "[log"[2]*"]"), x = "+/-1kb of TSS")
+    plot <- plot + labs(y = expression(Mean ~ intensity ~ "[log"[2] * "]"), x = "+/-1kb of TSS")
   }
 }
 
@@ -163,13 +163,13 @@ plot_stage_dynamics <- function(data, dyns, cols, timepoint, type, onlypeaks = F
       ylab(axis_titles[[type]]) +
       theme(axis.title.x = element_blank())
     if (add_signif) {
-      #comp_group <- c("Kept", "Expressed@6hpf", "GZ")
-      #x_comps <- setdiff(levels(plot_df$dyn), comp_group)
-      #x_comp <- intersect(levels(plot_df$dyn), comp_group)
-      #if (type == "promoter.dna.methyl") {
+      # comp_group <- c("Kept", "Expressed@6hpf", "GZ")
+      # x_comps <- setdiff(levels(plot_df$dyn), comp_group)
+      # x_comp <- intersect(levels(plot_df$dyn), comp_group)
+      # if (type == "promoter.dna.methyl") {
       #  x_comps <- rev(x_comps)
-      #}
-      #comparisons <- list(c(x_comp, x_comps[1]), c(x_comp, x_comps[2]))
+      # }
+      # comparisons <- list(c(x_comp, x_comps[1]), c(x_comp, x_comps[2]))
       comparisons <- list()
       dyn_levels <- levels(plot_df$dyn)
       for (i in 1:(length(dyn_levels) - 1)) {
@@ -211,7 +211,7 @@ plot_balloonplot <- function(x_dyns, y_dyns, limit = 50, sort_similar = FALSE, r
   fisher_p <- function(row, column) {
     mat <- genesAbsolute
     fisher_mat <- matrix(c(mat[row, column], sum(mat[-row, column]), sum(mat[row, -column]), sum(mat[-row, -column])), nrow = 2)
-    p_val <- fisher.test(fisher_mat, alternative="greater")$p.value
+    p_val <- fisher.test(fisher_mat, alternative = "greater")$p.value
     return(max(p_val, 10^(-limit)))
   }
 
@@ -248,154 +248,156 @@ plot_balloonplot <- function(x_dyns, y_dyns, limit = 50, sort_similar = FALSE, r
 
   my_cols <- rev(c("#DC267F", "#FE6100", "#FFB000", "#FFFFFF"))
   ggballoonplot(p_mat, fill = "value") +
-    theme_light() + labs(x = "", y = "") + labs(x = x_caption, y = y_caption) + rotate_x_text(45) +
+    theme_light() + labs(x = x_caption, y = y_caption) +
+    scale_x_discrete(labels = sapply(colnames(genesAbsolute), function(name) names(x_dyns)[which(make.names(names(x_dyns)) == name)])) +
+    rotate_x_text(45) +
     scale_fill_gradientn(colors = my_cols, limits = c(0, limit), values = c(0, 0.6, 0.7, 1), breaks = c(2, 10, 25, 35, limit), labels = c(1e-2, 1e-10, 1e-25, 1e-35, 10^(-limit))) + guides(size = guide_legend(title = "adjusted p value"), fill = guide_legend(title = "adjusted p value")) + scale_size(range = c(0, 10), limits = c(0, limit), breaks = c(2, 10, 25, 35, limit), labels = c(1e-2, 1e-10, 1e-25, 1e-35, 10^(-limit)))
 }
 
-plot_combined <- function(rep, control, zygotic_only, plot = "heatmap", dynamic = NULL, tp = NULL, experiment_type = "auxin") {
-    # Load and preprocess data
-    se <- preprocess_data(rep, zygotic_only, experiment_type)
-    tpms_norm <- normalize_tpms(se, control, experiment_type)
-    
-    if (plot == "violin") {
-        plot_violin(tpms_norm, rep, tp, dynamic, experiment_type)
-    } else {
-        plot_heatmap(tpms_norm, rep, experiment_type)
-    }
+subset_dynamics <- function(tpms, dynamic) {
+  if (dynamic %in% names(chip_dyns)) {
+    dyns <- chip_dyns
+  } else if (dynamic %in% names(rna_dyns)) {
+    dyns <- rna_dyns
+  }
+  labeled <- sapply(rownames(tpms), label_dyn, dyns = dyns)
+  tpms_subset <- tpms[labeled == dynamic & !is.na(labeled), ]
+  return(tpms_subset)
 }
 
-preprocess_data <- function(rep, zygotic_only, experiment_type) {
-    if (zygotic_only) {
-        se <- se[mapnames[rownames(se)] %in% c(rna_dyns$GZ, rna_dyns$ZS), ]
-    }
-    
-    if (experiment_type == "auxin") {
-        se <- se[, se@colData@listData$experiment_set == rep]
-        se <- se[, !grepl("Wt", se@colData@listData$condition)]
-    } else if (experiment_type == "morpholino") {
-        se <- se[, sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep]
-        se <- se[, !grepl("Wdr5", se@colData@listData$group)]
-        se <- se[, !grepl("256c Rep", se@colData@listData$group)]
-    }
-    
-    return(se)
+subset_tp <- function(tpms, tp) {
+  timepoints <- sapply(colnames(tpms), function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])
+  tpms <- tpms[, timepoints == names(table(timepoints))[tp]]
+  return(tpms)
 }
 
-normalize_tpms <- function(se, control, experiment_type) {
-    tpms <- se@assays@data@listData$tpms
-    tpms <- tpms[!(mapnames[rownames(tpms)] %in% names(table(mapnames)[table(mapnames) > 1])), ]
-    tpms <- tpms[complete.cases(tpms), ]
-    
-    if (experiment_type == "auxin") {
-        timepoints <- se@colData@listData$time_point
-        conditions <- se@colData@listData$condition
-    } else {
-        groups <- se@colData@listData$group
-        timepoints <- sapply(groups, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])
-        conditions <- sapply(groups, function(x) sub(" 256c(.*)", "", x))
-    }
-    
-    tpms_ctrl_normalize <- function(idx) {
-        if (experiment_type == "auxin") {
-            timepoint <- timepoints[idx]
-            mean_ctrl <- rowMeans(tpms[, timepoints == timepoint & conditions == control[conditions[idx]]])
-        } else {
-            group <- groups[idx]
-            timepoint <- regmatches(group, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", group))[1]
-            mean_ctrl <- rowMeans(tpms[, timepoints == timepoint & conditions == control])
-        }
-        return((tpms[, idx] + 1) / (mean_ctrl + 1))
-    }
-    
-    tpms_norm <- as.data.frame(sapply(1:ncol(tpms), tpms_ctrl_normalize))
-    rownames(tpms_norm) <- mapnames[rownames(tpms_norm)]
-    colnames(tpms_norm) <- groups
-    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
-    
-    return(tpms_norm)
+read_de_res <- function(idx, direction, files, dir, rep) {
+  timepoint <- files[idx, "timepoint"]
+  condition <- files[idx, "condition"]
+  rds <- readRDS(de_filename(dir, rep, timepoint, condition))
+  rds <- na.omit(rds, cols = c("padj", "log2FoldChange"))
+  if (direction == "up") {
+    res <- rownames(rds[rds$padj < 0.05 & rds$log2FoldChange > 0, ])
+    return(mapnames[res])
+  } else if (direction == "down") {
+    res <- rownames(rds[rds$padj < 0.05 & rds$log2FoldChange < 0, ])
+    return(mapnames[res])
+  }
 }
 
-plot_violin <- function(tpms_norm, rep, tp, dynamic, experiment_type) {
-    if (experiment_type == "auxin") {
-        tpms_norm <- tpms_norm[, se@colData@listData$experiment_set == rep & se@colData@listData$time_point == names(table(se@colData@listData$time_point))[tp] & !(se@colData@listData$condition %in% c("Wt-IAA", "Wt -IAA"))]
-        tpms_norm$condition <- sub("\\.[123]", "", colnames(tpms_norm))
-        scale_fill_values <- c("#7BC5CD", "#54868B", "#CE5C46", "#8C3F30")
-        comparisons <- list(c("Control -IAA", "Control +IAA"), c("Treated -IAA", "Control -IAA"), c("Treated +IAA", "Control +IAA"))
-        label_y <- c(1.9, 2.1, 2.3)
-    } else {
-        tpms_norm <- tpms_norm[, sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep & sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1]) == names(table(sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])))[tp]]
-        tpms_norm$condition <- sub("..$", "", colnames(tpms_norm))
-        scale_fill_values <- c("#E1DCC9", "#17395C", "#EFB758")
-        comparisons <- list(c("Kmt2b MO", "Ctrl MO"), c("Cxxc1 MO", "Ctrl MO"))
-        label_y <- c(2.4, 2.7)
-    }
-    
-    tpms_norm$genes <- rownames(tpms_norm)
-    tpms_norm <- melt(tpms_norm, variable.name = "condition", value.name = "value", na.rm = TRUE)
-    tpms_norm$dyn <- sapply(tpms_norm$genes, label_dyn, dyns = chip_dyns)
-    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
-    
-    ggviolin(tpms_norm, x = "condition", y = "value", fill = "condition", add = "boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) +
-        labs(y = "relative tpms +1", x = NULL, title = paste(dynamic, "& Zygotic (", names(table(se@colData@listData$time_point))[tp], ")")) +
-        theme_pubr() +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
-        scale_x_discrete(limits = c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA"), labels = function(x) sub("(IAA).*", "\\1", x)) +
-        scale_fill_manual(values = setNames(scale_fill_values, c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA"))) +
-        stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"), label.y = label_y) +
-        geom_hline(yintercept = 1, linetype = "dotted") +
-        coord_cartesian(ylim = c(0, 2.5))
+get_de_list <- function(dir, rep, de_timepoints, de_conditions, background) {
+  files <- expand.grid(timepoint = de_timepoints, condition = de_conditions)
+
+  up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up", files = files, dir = dir, rep=rep)))
+  down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down", files = files, dir=dir, rep=rep)))
+  de_list <- list("up" = up_list, "down" = down_list, "no change" = setdiff(background, union(up_list, down_list)))
+  return(de_list)
 }
 
-plot_heatmap <- function(tpms_norm, rep, experiment_type) {
-    if (experiment_type == "auxin") {
-        timepoints_rep12 <- c("T1" = "T1 256c + 1hr", "T2" = "T2 256c + 2hr", "T3" = "T3 256c + 3hr")
-        timepoints_str <- names(table(se@colData@listData$time_point))
-        if (rep %in% c(1, 2)) {
-            timepoints_str <- timepoints_rep12[timepoints_str]
-            conditions_order <- c("Control -IAA", "Control +IAA", "Treated -IAA", "Treated +IAA")
-        } else {
-            conditions_order <- c("Control-IAA", "Control+IAA", "Treated-IAA", "Treated+IAA")
-        }
-    } else {
-        conditions_order <- c("NI Ctrl", "Ctrl MO", "Cxxc1 MO", "Kmt2b MO")
-        timepoints_str <- names(table(sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])))
-    }
-    
-    column_order <- expand.grid(tech_rep = c(1, 2, 3), timepoint = timepoints_str, condition = conditions_order)
-    str_column_order <- paste(column_order$condition, paste0(rep, ".", column_order$tech_rep), column_order$timepoint)
-    
-    tpms_norm <- tpms_norm[, str_column_order]
-    tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
-    
-    col_fun <- colorRamp2(c(0, 1, 2), c("blue", "white", "red"))
-    hm <- Heatmap(tpms_norm,
-                  use_raster = TRUE,
-                  col = col_fun,
-                  name = "relative tpms+1",
-                  column_split = column_order$condition,
-                  cluster_columns = FALSE,
-                  cluster_column_slices = FALSE,
-                  cluster_row_slices = FALSE,
-                  row_split = factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = chip_dyns), "& Zygotic"), levels = c("Gained & Zygotic", "Kept & Zygotic")),
-                  show_row_names = FALSE,
-                  show_row_dend = FALSE,
-                  row_title_rot = 0)
-    
-    tpms_norm$rna_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = rna_dyns)
-    hm_rna <- Heatmap(tpms_norm$rna_dyn,
-                      use_raster = TRUE,
-                      name = "RNA dynamic",
-                      col = cols_rna)
-    
-    tpms_norm$de_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = de_list)
-    tpms_norm$de_dyn[is.na(tpms_norm$de_dyn)] <- "no change"
-    hm_de <- Heatmap(tpms_norm$de_dyn,
-                     use_raster = TRUE,
-                     name = "Differential expression",
-                     col = c("down" = "#2A2D7C", "up" = "#CD2027", "no change" = "#BFBEBE"))
-    
+normalize_tpms <- function(se, controls, pseudocount = 1) {
+  tpms <- se@assays@data@listData$tpms
+  tpms <- tpms[!(mapnames[rownames(tpms)] %in% names(table(mapnames)[table(mapnames) > 1])), ]
+  tpms <- tpms[complete.cases(tpms), ]
+  rownames(tpms) <- mapnames[rownames(tpms)]
+
+  groups <- se@colData@listData$group
+  timepoints <- sapply(groups, function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])
+  conditions <- sapply(groups, function(x) sub(" 256c(.*)", "", x))
+  tpms_over_ctrl <- function(idx) {
+    mean_ctrl <- rowMeans(tpms[, timepoints == timepoints[idx] & conditions == controls[conditions[idx]]])
+    return((tpms[, idx] + pseudocount) / (mean_ctrl + pseudocount))
+  }
+
+  tpms_norm <- as.data.frame(sapply(1:ncol(tpms), tpms_over_ctrl))
+  colnames(tpms_norm) <- groups
+
+  return(tpms_norm)
+}
+
+
+plot_violin <- function(tpms_norm, cols, comparisons, y_max, order, title) {
+  tpms_norm$genes <- rownames(tpms_norm)
+  tpms_long <- melt(tpms_norm, variable.name = "condition", value.name = "value", na.rm = TRUE)
+  tpms_long$condition <- factor(sapply(tpms_long$condition, function(x) strsplit(as.character(x), " ")[[1]][1]))
+
+  ggviolin(tpms_long, x = "condition", y = "value", fill = "condition", add = "boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) +
+    labs(y = "fold change", x = NULL, title = title) +
+    theme_pubr() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+    scale_x_discrete(limits = order) +
+    scale_fill_manual(values = cols) +
+    stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"), label.y = y_max * (1 - seq_along(comparisons) * 0.1)) +
+    geom_hline(yintercept = 1, linetype = "dotted") +
+    coord_cartesian(ylim = c(0, y_max))
+}
+
+plot_heatmap <- function(tpms_norm, order, de_list = NULL, hm_rows = "chip_dyns", only_de = FALSE) {
+  if (only_de) {
+    tpms_norm <- tpms_norm[rownames(tpms_norm) %in% c(de_list$up, de_list$down), ]
+  }
+
+  colnames(tpms_norm) <- gsub("Rep [A-Za-z0-9]+\\.", "TR ", colnames(tpms_norm))
+  timepoints <- sapply(colnames(tpms_norm), function(x) regmatches(x, regexpr("\\b[0-9]+[a-zA-Z](\\+[0-9]+hr)?\\b", x))[1])
+  column_order <- expand.grid(tech_rep = c(1, 2, 3), timepoint = names(table(timepoints)), condition = order)
+  str_column_order <- paste(column_order$condition, column_order$timepoint, "TR", column_order$tech_rep)
+
+  tpms_norm <- tpms_norm[, str_column_order]
+  tpms_norm <- tpms_norm[complete.cases(tpms_norm), ]
+
+  if (hm_rows == "chip_dyns") {
+    row_slices <- chip_dyns[c("Gained", "Kept", "Absent")]
+  } else if (hm_rows == "de") {
+    row_slices <- de_list
+  }
+
+  tpms_norm <- tpms_norm[rownames(tpms_norm) %in% unlist(row_slices), ]
+  row_split <- factor(paste(sapply(rownames(tpms_norm), label_dyn, dyn = row_slices), "& Zygotic"), levels = paste(names(row_slices), "& Zygotic"))
+
+  col_fun <- colorRamp2(c(0, 1, 2), c("blue", "white", "red"))
+  hm <- Heatmap(tpms_norm,
+    use_raster = TRUE,
+    col = col_fun,
+    name = "fold change",
+    column_split = column_order$condition,
+    cluster_columns = FALSE,
+    cluster_column_slices = FALSE,
+    cluster_row_slices = FALSE,
+    row_split = row_split,
+    show_row_names = FALSE,
+    show_row_dend = FALSE,
+    row_title_rot = 0,
+    column_labels = sapply(strsplit(colnames(tpms_norm), " "), function(x) paste(gsub("256c", "", x[-1]), collapse = " "))
+  )
+
+  tpms_norm$rna_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = rna_dyns)
+  hm_rna <- Heatmap(tpms_norm$rna_dyn,
+    use_raster = TRUE,
+    name = "RNA dynamic",
+    col = cols_rna,
+  )
+
+  tpms_norm$chip_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = chip_dyns)
+  hm_chip <- Heatmap(tpms_norm$chip_dyn,
+    use_raster = TRUE,
+    name = "H3K4me3 dynamic",
+    col = cols_chip,
+  )
+
+  tpms_norm$de_dyn <- sapply(rownames(tpms_norm), label_dyn, dyns = de_list)
+  tpms_norm$de_dyn[is.na(tpms_norm$de_dyn)] <- "no change"
+  hm_de <- Heatmap(tpms_norm$de_dyn,
+    use_raster = TRUE,
+    name = "Differential expression",
+    col = c("down" = "#2A2D7C", "up" = "#CD2027", "no change" = "#BFBEBE"),
+  )
+
+  if (hm_rows == "chip_dyns") {
     hm <- hm + hm_de + hm_rna
-    draw(hm)
+  } else if (hm_rows == "de") {
+    hm <- hm + hm_chip + hm_rna
+  }
+
+  return(hm)
 }
 
 assignChromosomeRegion <- function(peaks.RD, exon, TSS, utr5, utr3, proximal.promoter.cutoff = c(

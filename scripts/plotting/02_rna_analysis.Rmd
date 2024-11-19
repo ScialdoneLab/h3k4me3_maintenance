@@ -145,13 +145,13 @@ rna_dyns_timing_sizes = unlist(lapply(rna_dyns_timing, function(x) length(x)))
 ```
 
 ## Save data
-```{r eval = FALSE}
-response <- readline("Do you want to save the dynamics? (yes/no): ")
-if (tolower(response) == "yes") {
-    save(rna_dyns, rna_dyns_timing, rna_dyns_complete, expression.data, file="data/processed/rna_dynamics.RData")
-} else {
-  print("Dynamics not saved")
-}
+```{r eval = TRUE}
+#response <- readline("Do you want to save the dynamics? (yes/no): ")
+#if (tolower(response) == "yes") {
+save(rna_dyns, rna_dyns_timing, rna_dyns_complete, expression.data, file="data/processed/rna_dynamics.RData")
+#} else {
+#  print("Dynamics not saved")
+#}
 ```
 
 ## Plot legend
