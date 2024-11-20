@@ -15,19 +15,8 @@ source("scripts/settings.R")
 ```{r}
 sperm_data <- "Oikawa" # Oikawa or Teperek
 ```
-
-## Load genome and fasta
-```{r message=FALSE, warning=FALSE}
-Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
-allgenes <- genes(Xenla10.1_TxDb)
-rm(Xenla10.1_TxDb)
-
-Xenla10.1_fa <- readDNAStringSet("data/raw/genome/XENLA_10.1_genome.fa", "fasta")
-chr <- names(Xenla10.1_fa[1:18, ])
-rm(Xenla10.1_fa)
-
-allgenes <- allgenes[seqnames(allgenes) %in% chr]
-promoters_chr <- promoters(allgenes, upstream = 0, downstream = 1)
+```{r}
+load("data/processed/genome.RData")
 ```
 
 ## Load dataset: Spermatid H3K4me3 Teperek
@@ -41,12 +30,12 @@ H3K4me3_spermatid.cov3 <- readGranges(paste0(spermatid_dir, "GSM1944499_ranges.r
 H3K4me3_spermatid.cov <- c(H3K4me3_spermatid.cov1, H3K4me3_spermatid.cov2, H3K4me3_spermatid.cov3)
 
 # Merged data
-H3K4me3_spermatid_raw <- enrichment(H3K4me3_spermatid.cov, "Spermatid Merged Reps", value_name=expression("H3K4me3 [log"[2]*"]"))
+H3K4me3_spermatid_raw <- logcoverage(H3K4me3_spermatid.cov, "Spermatid Merged Reps", value_name = expression("H3K4me3 [log"[2] * "]"))
 
 # Individual replicates (optional)
-# H3K4me3_spermatid.rep1 <- enrichment(H3K4me3_spermatid.cov1, "Spermatid Rep1", value_name=expression("H3K4me3 [log"[2]*"]"))
-# H3K4me3_spermatid.rep2 <- enrichment(H3K4me3_spermatid.cov2, "Spermatid Rep2", value_name=expression("H3K4me3 [log"[2]*"]"))
-# H3K4me3_spermatid.rep3 <- enrichment(H3K4me3_spermatid.cov3, "Spermatid Rep3", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_spermatid.rep1 <- logcoverage(H3K4me3_spermatid.cov1, "Spermatid Rep1", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_spermatid.rep2 <- logcoverage(H3K4me3_spermatid.cov2, "Spermatid Rep2", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_spermatid.rep3 <- logcoverage(H3K4me3_spermatid.cov3, "Spermatid Rep3", value_name=expression("H3K4me3 [log"[2]*"]"))
 
 rm(H3K4me3_spermatid.cov1, H3K4me3_spermatid.cov2, H3K4me3_spermatid.cov3, H3K4me3_spermatid.cov)
 print("Dataset: Spermatid H3K4me3 Teperek loaded")
@@ -71,12 +60,12 @@ if (sperm_data == "Oikawa") {
 }
 
 # Merged data
-H3K4me3_sperm_raw <- enrichment(H3K4me3_sperm.cov, "Sperm Merged Reps", value_name=expression("H3K4me3 [log"[2]*"]"))
+H3K4me3_sperm_raw <- logcoverage(H3K4me3_sperm.cov, "Sperm Merged Reps", value_name = expression("H3K4me3 [log"[2] * "]"))
 
 # Individual replicates (optional)
-# H3K4me3_sperm.rep1 <- enrichment(H3K4me3_sperm.cov1, "Sperm Rep1", value_name="H3K4me3 [log2], value_name=expression("H3K4me3 [log"[2]*"]"))
-# H3K4me3_sperm.rep2 <- enrichment(H3K4me3_sperm.cov2, "Sperm Rep2", value_name="H3K4me3 [log2], value_name=expression("H3K4me3 [log"[2]*"]"))
-# H3K4me3_sperm.rep3 <- enrichment(H3K4me3_sperm.cov3, "Sperm Rep3", value_name="H3K4me3 [log2], value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_sperm.rep1 <- logcoverage(H3K4me3_sperm.cov1, "Sperm Rep1", value_name="H3K4me3 [log2], value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_sperm.rep2 <- logcoverage(H3K4me3_sperm.cov2, "Sperm Rep2", value_name="H3K4me3 [log2], value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_sperm.rep3 <- logcoverage(H3K4me3_sperm.cov3, "Sperm Rep3", value_name="H3K4me3 [log2], value_name=expression("H3K4me3 [log"[2]*"]"))
 
 rm(H3K4me3_sperm.cov2, H3K4me3_sperm.cov3, H3K4me3_sperm.cov)
 print(paste0("Dataset: Sperm H3K4me3 ", sperm_data, " loaded"))
@@ -93,11 +82,11 @@ H3K4me3_prezga.cov2 <- readRDS(paste0(pre_zga_dir, "GSM3671369_ranges.rds"))
 H3K4me3_prezga.cov <- c(H3K4me3_prezga.cov1, H3K4me3_prezga.cov2)
 
 # Merged data
-H3K4me3_prezga_raw <- enrichment(H3K4me3_prezga.cov, "256c Merged Reps", value_name=expression("H3K4me3 [log"[2]*"]"))
+H3K4me3_prezga_raw <- logcoverage(H3K4me3_prezga.cov, "256c Merged Reps", value_name = expression("H3K4me3 [log"[2] * "]"))
 
 # Individual replicates (optional)
-# H3K4me3_prezga.rep1 <- enrichment(H3K4me3_prezga.cov1, "256c Rep1", value_name=expression("H3K4me3 [log"[2]*"]"))
-# H3K4me3_prezga.rep2 <- enrichment(H3K4me3_prezga.cov2, "256c Rep2", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_prezga.rep1 <- logcoverage(H3K4me3_prezga.cov1, "256c Rep1", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_prezga.rep2 <- logcoverage(H3K4me3_prezga.cov2, "256c Rep2", value_name=expression("H3K4me3 [log"[2]*"]"))
 
 rm(H3K4me3_prezga.cov1, H3K4me3_prezga.cov2, H3K4me3_prezga.cov)
 print("Pre-ZGA (256c) H3K4me3 Eva/Oikawa loaded")
@@ -109,23 +98,18 @@ zga_dir <- "data/raw/h3k4me3/zga/"
 
 # IP coverage replicates
 H3K4me3_zga.cov1 <- readRDS(paste0(zga_dir, "GSM1973491_ranges.rds"))
-H3K4me3_zga.cov2 <- readRDS(paste0(zga_dir,"GSM1973492_ranges.rds"))
+H3K4me3_zga.cov2 <- readRDS(paste0(zga_dir, "GSM1973492_ranges.rds"))
 H3K4me3_zga.cov <- c(H3K4me3_zga.cov1, H3K4me3_zga.cov2)
 
 # Merged data
-H3K4me3_zga_raw <- enrichment(H3K4me3_zga.cov, "St10.5 Merged Reps", value_name=expression("H3K4me3 [log"[2]*"]"))
+H3K4me3_zga_raw <- logcoverage(H3K4me3_zga.cov, "St10.5 Merged Reps", value_name = expression("H3K4me3 [log"[2] * "]"))
 
 # Individual replicates (optional)
-# H3K4me3_zga.rep1 <- enrichment(H3K4me3_zga.cov1, "St10.5 Rep1", value_name=expression("H3K4me3 [log"[2]*"]"))
-# H3K4me3_zga.rep2 <- enrichment(H3K4me3_zga.cov2, "St10.5 Rep2", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_zga.rep1 <- logcoverage(H3K4me3_zga.cov1, "St10.5 Rep1", value_name=expression("H3K4me3 [log"[2]*"]"))
+# H3K4me3_zga.rep2 <- logcoverage(H3K4me3_zga.cov2, "St10.5 Rep2", value_name=expression("H3K4me3 [log"[2]*"]"))
 
 rm(H3K4me3_zga.cov1, H3K4me3_zga.cov2, H3K4me3_zga.cov)
 print("ZGA (St10.5) H3K4me3 Session loaded")
-```
-
-```{r}
-chip_norm_mats <- list(H3K4me3_spermatid_raw, H3K4me3_sperm_raw, H3K4me3_prezga_raw, H3K4me3_zga_raw)
-names(chip_norm_mats) <- stages
 ```
 
 ## Load peak calling data (broad)
@@ -159,48 +143,19 @@ D6_S10H3K4me3_bed <- c(D6_bed1, D6_bed2)
 strand(D6_S10H3K4me3_bed) <- NA
 
 rm(D0_bed1, D0_bed2, D0_bed3, D1_bed2, D1_bed3, D3_bed1, D3_bed2, D6_bed1, D6_bed2)
+```
 
-promoters_1kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
-h3k4stages <- list(D0_spdH3K4me3_bed, D1_spH3K4me3_bed, D3_S7H3K4me3_bed, D6_S10H3K4me3_bed)
-names(h3k4stages) <- stages
+```{r}
+chip_norm_mats <- setNames(list(H3K4me3_spermatid_raw, H3K4me3_sperm_raw, H3K4me3_prezga_raw, H3K4me3_zga_raw), stages)
+chip_peaks <- setNames(list(D0_spdH3K4me3_bed, D1_spH3K4me3_bed, D3_S7H3K4me3_bed, D6_S10H3K4me3_bed), stages)
 
-overlaps <- lapply(h3k4stages, function(x) {
-  findOverlaps(promoters_1kb, x, select = "first")
-})
-peak_widths <- lapply(stages, function(y) {
-  sapply(overlaps[[y]], function(x) {
-    if (is.na(x)) {
-      0
-    } else {
-      width(h3k4stages[[y]][x])
-    }
-  })
-})
-names(peak_widths) <- stages
-peak_binary <- lapply(peak_widths, function(x) {
-  x > 0
-})
-
-build_df <- function(norm_matrix, binarized, widths) {
-  df <- data.frame(
-    "promoter.enrich" = enriched_score(norm_matrix),
-    "peak" = binarized,
-    "peak.width" = widths,
-    "promoter.max" = apply(norm_matrix, 1, max),
-    "promoter.mean" = rowMeans(norm_matrix),
-    row.names = allgenes$gene_id
-  )
-}
-
-chip_dfs <- lapply(stages, function(x) {
-  build_df(chip_norm_mats[[x]], peak_binary[[x]], peak_widths[[x]])
-})
-names(chip_dfs) <- stages
+chip_dfs <- lapply(names(chip_norm_mats), function(stage) build_df(chip_norm_mats[[stage]], chip_peaks[[stage]]))
+names(chip_dfs) <- names(chip_norm_mats)
 ```
 
 ```{r}
 # Save data
-save(chip_dfs, chip_norm_mats, allgenes, promoters_chr, h3k4stages,
+save(chip_dfs, chip_norm_mats, chip_peaks,
   file = paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData")
 )
 ```

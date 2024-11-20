@@ -362,7 +362,8 @@ source(&quot;scripts/settings.R&quot;)</code></pre>
 </div>
 <div id="load-data" class="section level2">
 <h2>Load data</h2>
-<pre class="r"><code>load(&quot;data/processed/rna_dynamics.RData&quot;)
+<pre class="r"><code>load(&quot;data/processed/genome.RData&quot;)
+load(&quot;data/processed/rna_dynamics.RData&quot;)
 load(&quot;data/processed/chip_dynamics.RData&quot;)
 
 morpholino_dir &lt;- &quot;data/raw/morpholinos/&quot;
@@ -486,7 +487,7 @@ for (rep in c(&quot;I&quot;, &quot;II&quot;)) {
                             comp_dyns[[intersection_name]] &lt;- intersect(chip_dyns[[chip_dyn]], rna_dyns[[rna_dyn]])
                         }
                     }
-                } else if(dyns == &quot;rna_timing&quot;){
+                } else if (dyns == &quot;rna_timing&quot;) {
                     comp_dyns &lt;- rna_dyns_timing
                 }
 
@@ -569,6 +570,54 @@ for (rep in c(&quot;I&quot;, &quot;II&quot;)) {
 ## Scale for size is already present.
 ## Adding another scale for size, which will replace the existing scale.
 ## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.
+## Scale for size is already present.
+## Adding another scale for size, which will replace the existing scale.</code></pre>
+</div>
+<div id="balloon-plots-of-zygotic-timing" class="section level2">
+<h2>Balloon plots of zygotic timing</h2>
+<pre class="r"><code>tps &lt;- c(&quot;1hr&quot;, &quot;2hr&quot;, &quot;3hr&quot;)
+conditions &lt;- c(&quot;Cxxc1&quot;, &quot;Kmt2b&quot;)
+
+for (rep in c(&quot;I&quot;, &quot;II&quot;)) {
+    for (tp in tps) {
+        for (condition in conditions) {
+            de_list &lt;- get_de_list(morpholino_dir, rep,
+                de_timepoints &lt;- tp,
+                de_conditions &lt;- condition,
+                background = unique(unlist(chip_dyns))
+            )
+
+            comp_dyns &lt;- lapply(chip_dyns[names(chip_dyns) %in% c(&quot;Kept&quot;, &quot;Gained&quot;, &quot;Absent&quot;)], function(x) intersect(x, c(rna_dyns$GZ, rna_dyns$ZS)))
+            comp_dyns &lt;- lapply(comp_dyns, function(x) intersect(x, de_list$down))
+            names(comp_dyns) &lt;- paste(names(comp_dyns), &quot;&amp; Zygotic&quot;)
+
+            plot_balloonplot(x_dyns = rna_dyns_timing, y_dyns = comp_dyns, limit = 200, x_caption = &quot;RNA timing&quot;, y_caption = &quot;Dynamics&quot;)
+            ggsave(paste0(&quot;output/morpholinos/balloon_plot_timing_rep&quot;, rep, &quot;_&quot;, tp, &quot;_&quot;, condition, &quot;.pdf&quot;), width = 4, height = 4)
+        }
+    }
+}</code></pre>
+<pre><code>## Scale for size is already present.
 ## Adding another scale for size, which will replace the existing scale.
 ## Scale for size is already present.
 ## Adding another scale for size, which will replace the existing scale.

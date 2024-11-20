@@ -13,6 +13,7 @@ source("scripts/utils.R")
 source("scripts/settings.R")
 ```
 ```{r}
+load("data/processed/genome.RData")
 load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```
 ```{r message=FALSE}

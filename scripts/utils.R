@@ -7,6 +7,22 @@ lapply(packages, require, character.only = TRUE)
 
 stages <- list("Spermatid", "Sperm", "Pre-ZGA", "ZGA")
 
+build_df <- function(norm_matrix, peaks) {
+  overlaps <- findOverlaps(promoters_1kb, peaks, select = "first")
+
+  peak_widths <- sapply(overlaps, function(x) ifelse(is.na(x), 0, width(peaks[x])))
+  peak_binary <- peak_widths > 0
+
+  df <- data.frame(
+    "promoter.enrich" = enriched_score(norm_matrix),
+    "peak" = peak_binary,
+    "peak.width" = peak_widths,
+    "promoter.max" = apply(norm_matrix, 1, max),
+    "promoter.mean" = rowMeans(norm_matrix),
+    row.names = allgenes$gene_id
+  )
+}
+
 compute_peak_combinations <- function(dfs) {
   stages <- names(dfs)
   combinations <- list()
@@ -52,7 +68,7 @@ readGranges <- function(filename) {
   granges_chr <- granges[seqnames(granges) %in% chr]
 }
 
-enrichment <- function(coverage, title, mode = "ranges", value_name = NULL) {
+logcoverage <- function(coverage, title, mode = "ranges", value_name = NULL) {
   if (mode == "ranges") {
     coverage <- normalizeToMatrix(coverage, promoters_chr, extend = 1000, mean_mode = "coverage")
   } else if (mode == "coverage") {
@@ -288,8 +304,8 @@ read_de_res <- function(idx, direction, files, dir, rep) {
 get_de_list <- function(dir, rep, de_timepoints, de_conditions, background) {
   files <- expand.grid(timepoint = de_timepoints, condition = de_conditions)
 
-  up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up", files = files, dir = dir, rep=rep)))
-  down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down", files = files, dir=dir, rep=rep)))
+  up_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "up", files = files, dir = dir, rep = rep)))
+  down_list <- unique(unlist(sapply(1:nrow(files), read_de_res, direction = "down", files = files, dir = dir, rep = rep)))
   de_list <- list("up" = up_list, "down" = down_list, "no change" = setdiff(background, union(up_list, down_list)))
   return(de_list)
 }
@@ -314,11 +330,11 @@ normalize_tpms <- function(se, controls, pseudocount = 1) {
   return(tpms_norm)
 }
 
-
 plot_violin <- function(tpms_norm, cols, comparisons, y_max, order, title) {
   tpms_norm$genes <- rownames(tpms_norm)
   tpms_long <- melt(tpms_norm, variable.name = "condition", value.name = "value", na.rm = TRUE)
   tpms_long$condition <- factor(sapply(tpms_long$condition, function(x) strsplit(as.character(x), " ")[[1]][1]))
+  tpms_long <- tpms_long[tpms_long$condition %in% order,]
 
   ggviolin(tpms_long, x = "condition", y = "value", fill = "condition", add = "boxplot", add.params = list(fill = "white"), linetype = "solid", size = 0.01) +
     labs(y = "fold change", x = NULL, title = title) +
@@ -326,7 +342,7 @@ plot_violin <- function(tpms_norm, cols, comparisons, y_max, order, title) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
     scale_x_discrete(limits = order) +
     scale_fill_manual(values = cols) +
-    stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"), label.y = y_max * (1 - seq_along(comparisons) * 0.1)) +
+    stat_compare_means(comparisons = comparisons, method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"), label.y = y_max * (1 - seq_along(comparisons) * 0.1)) + # nolint: object_usage_linter.
     geom_hline(yintercept = 1, linetype = "dotted") +
     coord_cartesian(ylim = c(0, y_max))
 }

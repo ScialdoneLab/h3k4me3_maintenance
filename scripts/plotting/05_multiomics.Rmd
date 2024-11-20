@@ -13,6 +13,7 @@ source("scripts/utils.R")
 source("scripts/settings.R")
 ```
 ```{r}
+load("data/processed/genome.RData")
 load("data/processed/dname.RData")
 load("data/processed/accessibility.RData")
 load("data/processed/rna_dynamics.RData")
@@ -49,7 +50,7 @@ gg_color_hue <- function(n) {
 }
 
 Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
-pre_zga_data <- list("H3K4me3" = h3k4stages[["Pre-ZGA"]], "DNAme" = DNAme_stages[["Pre-ZGA"]], "Accessibility" = accessibility_stages[["Pre-ZGA"]])
+pre_zga_data <- list("H3K4me3" = chip_peaks[["Pre-ZGA"]], "DNAme" = DNAme_peaks[["Pre-ZGA"]], "Accessibility" = accessibility_peaks[["Pre-ZGA"]])
 genodis <- lapply(pre_zga_data, function(x) {
   assignChromosomeRegion(x,
     nucleotideLevel = FALSE, proximal.promoter.cutoff = c(upstream = 1000, downstream = 1000), precedence = c("Promoters", "immediateDownstream", "fiveUTRs", "threeUTRs", "Exons", "Introns"),
@@ -323,6 +324,7 @@ hm_rna <- Heatmap(scaled_data,
   cluster_columns = clustering,
   show_row_names = TRUE,
   cluster_rows = clustering,
+  column_order = c("GS", "GZ", "ZS", "ND"),
   row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
   row_title_rot = 0,
 )
@@ -373,6 +375,7 @@ hm_chip <- Heatmap(scaled_data,
   cluster_columns = clustering,
   show_row_names = TRUE,
   cluster_rows = clustering,
+  column_order = c("Lost", "Kept", "Gained", "Absent"),
   row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
   row_title_rot = 0,
 )
@@ -397,6 +400,7 @@ hm_chip <- Heatmap(scaled_data,
   cluster_columns = clustering,
   show_row_names = TRUE,
   cluster_rows = clustering,
+  column_order = c("Lost@Sperm", "Lost@Pre-ZGA", "Lost@ZGA", "Kept", "GainedEarly", "GainedLate", "Absent"),
   row_split = c("DNA methylation", "DNA methylation", "DNA methylation", "Accessibility", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
   row_title_rot = 0,
 )
@@ -421,6 +425,10 @@ hm <- Heatmap(scaled_data,
   cluster_columns = clustering,
   show_row_names = TRUE,
   cluster_rows = clustering,
+  column_order = c("Lost & GS", "Lost & GZ", "Lost & ZS", "Lost & ND", 
+                   "Kept & GS", "Kept & GZ", "Kept & ZS", "Kept & ND", 
+                   "Gained & GZ", "Gained & ZS", "Gained & ND", 
+                   "Absent & GS", "Absent & GZ", "Absent & ZS", "Absent & ND"),
   row_split = c("Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Peak width", "Promoter mean", "DNA Methylation", "Accessibility", "Peak width", "Promoter mean", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "Expression levels", "CG density"),
   row_title_rot = 0,
 )

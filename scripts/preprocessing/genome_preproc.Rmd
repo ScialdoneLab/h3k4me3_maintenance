@@ -1,0 +1,34 @@
+---
+title: "Genome preprocessing"
+author: "Marco Stock"
+---
+
+## Setup
+```{r include = FALSE}
+library(here)
+knitr::opts_knit$set(root.dir = here::here())
+```
+```{r, message = FALSE}
+source("scripts/utils.R")
+source("scripts/settings.R")
+```
+
+## Load genome and fasta
+```{r message=FALSE, warning=FALSE}
+Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
+allgenes <- genes(Xenla10.1_TxDb)
+rm(Xenla10.1_TxDb)
+
+Xenla10.1_fa <- readDNAStringSet("data/raw/genome/XENLA_10.1_genome.fa", "fasta")
+chr <- names(Xenla10.1_fa[1:18, ])
+rm(Xenla10.1_fa)
+
+allgenes <- allgenes[seqnames(allgenes) %in% chr]
+promoters_chr <- promoters(allgenes, upstream = 0, downstream = 1)
+promoters_1kb <- promoters(allgenes, upstream = 1000, downstream = 1000)
+```
+
+```{r}
+# Save data
+save(allgenes, chr, promoters_chr, promoters_1kb, file = paste0("data/processed/genome.RData"))
+```

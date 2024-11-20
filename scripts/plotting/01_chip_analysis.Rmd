@@ -13,6 +13,7 @@ source("scripts/utils.R")
 source("scripts/settings.R")
 ```
 ```{r}
+load("data/processed/genome.RData")
 load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 ```
 
@@ -24,7 +25,7 @@ gg_color_hue <- function(n) {
 }
 
 Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
-genodis <- lapply(h3k4stages, function(x) {
+genodis <- lapply(chip_peaks, function(x) {
   assignChromosomeRegion(x,
     nucleotideLevel = FALSE, proximal.promoter.cutoff = c(upstream = 1000, downstream = 1000), precedence = c("Promoters", "immediateDownstream", "fiveUTRs", "threeUTRs", "Exons", "Introns"),
     TxDb = Xenla10.1_TxDb
@@ -32,7 +33,7 @@ genodis <- lapply(h3k4stages, function(x) {
 })
 b <- matrix(unlist(genodis), nrow = 14)
 genodis2 <- b[1:7, ]
-colnames(genodis2) <- names(h3k4stages)
+colnames(genodis2) <- names(chip_peaks)
 rownames(genodis2) <- c("Promoters", "ImmediateDownstream", "FiveUTRs", "ThreeUTRs", "Exons", "Introns", "Intergenic regions")
 ggdf1 <- melt(genodis2)
 ggdf1$Var1 <- factor(ggdf1$Var1, levels = rev(rownames(genodis2)))

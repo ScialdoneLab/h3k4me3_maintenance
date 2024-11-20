@@ -12,13 +12,12 @@ knitr::opts_knit$set(root.dir = here::here())
 source("scripts/utils.R")
 source("scripts/settings.R")
 ```
+```{r}
+load("data/processed/genome.RData")
+```
 
 ## Load genome
 ```{r}
-Xenla10.1_TxDb <- loadDb("data/raw/genome/Xenla10.1.sqlite")
-allgenes <- genes(Xenla10.1_TxDb)
-rm(Xenla10.1_TxDb)
-
 Xenla10.1_fa <- readDNAStringSet("data/raw/genome/XENLA_10.1_genome.fa", "fasta")
 chr <- names(Xenla10.1_fa[1:18, ])
 

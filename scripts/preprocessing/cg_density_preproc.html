@@ -359,15 +359,11 @@ display: none;
 <h2>Setup</h2>
 <pre class="r"><code>source(&quot;scripts/utils.R&quot;)
 source(&quot;scripts/settings.R&quot;)</code></pre>
+<pre class="r"><code>load(&quot;data/processed/genome.RData&quot;)</code></pre>
 </div>
 <div id="load-genome" class="section level2">
 <h2>Load genome</h2>
-<pre class="r"><code>Xenla10.1_TxDb &lt;- loadDb(&quot;data/raw/genome/Xenla10.1.sqlite&quot;)</code></pre>
-<pre><code>## Loading required package: GenomicFeatures</code></pre>
-<pre class="r"><code>allgenes &lt;- genes(Xenla10.1_TxDb)
-rm(Xenla10.1_TxDb)
-
-Xenla10.1_fa &lt;- readDNAStringSet(&quot;data/raw/genome/XENLA_10.1_genome.fa&quot;, &quot;fasta&quot;)
+<pre class="r"><code>Xenla10.1_fa &lt;- readDNAStringSet(&quot;data/raw/genome/XENLA_10.1_genome.fa&quot;, &quot;fasta&quot;)
 chr &lt;- names(Xenla10.1_fa[1:18, ])
 
 promoters_2kb &lt;- promoters(allgenes, upstream = 1000, downstream = 1000)

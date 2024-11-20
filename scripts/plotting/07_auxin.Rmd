@@ -15,6 +15,7 @@ source("scripts/settings.R")
 
 ## Load data
 ```{r}
+load("data/processed/genome.RData")
 load("data/processed/rna_dynamics.RData")
 load("data/processed/chip_dynamics.RData")
 
@@ -72,15 +73,25 @@ for (rep in 2:3) {
         tpms_norm_dyn <- subset_dynamics(tpms_norm, dyn)
         for (tp in 1:3) {
             tpms_norm_dyn_tp <- subset_tp(tpms_norm_dyn, tp)
-            violin <- plot_violin(tpms_norm_dyn_tp,
-                cols = c("#7BC5CD", "#54868B", "#CE5C46", "#8C3F30"),
-                order = c("Control-IAA", "Control+IAA", "Treated-IAA", "Treated+IAA"),
-                comparisons = list(c("Treated-IAA", "Control-IAA"), c("Treated+IAA", "Control+IAA")),
-                y_max = 2.5,
-                title = paste0(dyn, " & Zygotic (T", tp, ")")
-            )
-            plot(violin)
-            ggsave(paste0("output/auxin/violin_zygotic_rep", rep, "_", dyn, "_t", tp, ".pdf"), width = 5, height = 4)
+            for (condition in c("mIAA", "pIAA")) {
+                if (condition == "mIAA") {
+                    cols <- c("#7BC5CD", "#CE5C46")
+                    order <- c("Control-IAA", "Treated-IAA")
+                } else if(condition == "pIAA") {
+                    cols <- c("#54868B", "#8C3F30")
+                    order <- c("Control+IAA", "Treated+IAA")
+                }
+
+                violin <- plot_violin(tpms_norm_dyn_tp,
+                    cols = cols,
+                    order = order,
+                    comparisons = list(rev(order)),
+                    y_max = 2.5,
+                    title = paste0(dyn, " & Zygotic (T", tp, ")")
+                )
+                plot(violin)
+                ggsave(paste0("output/auxin/violin_zygotic_rep", rep, "_", dyn, "_t", tp, "_", condition, ".pdf"), width = 3, height = 4)
+            }
         }
     }
 }
@@ -191,6 +202,31 @@ for (rep in 2:3) {
 
             plot_balloonplot(x_dyns = comp_dyns, y_dyns = overlap_dyns[[tp]], limit = 200, x_caption = paste(dyns, "dynamics"), y_caption = "Downregulated genes")
             ggsave(paste0("output/auxin/balloon_plot_down_rep", rep, "_", dyns, "_", tp, ".pdf"), width = 4, height = 4)
+        }
+    }
+}
+```
+
+## Balloon plots of zygotic timing
+```{r warning=FALSE}
+tps <- c("T1", "T2", "T3")
+conditions <- c("mIAA", "pIAA")
+
+for (rep in 2:3) {
+    for (tp in tps) {
+        for (condition in conditions) {
+            de_list <- get_de_list(auxin_dir, rep,
+                de_timepoints <- tp,
+                de_conditions <- condition,
+                background = unique(unlist(chip_dyns))
+            )
+
+            comp_dyns <- lapply(chip_dyns[names(chip_dyns) %in% c("Kept", "Gained", "Absent")], function(x) intersect(x, c(rna_dyns$GZ, rna_dyns$ZS)))
+            comp_dyns <- lapply(comp_dyns, function(x) intersect(x, de_list$down))
+            names(comp_dyns) <- paste(names(comp_dyns), "& Zygotic")
+
+            plot_balloonplot(x_dyns = rna_dyns_timing, y_dyns = comp_dyns, limit = 200, x_caption = "RNA timing", y_caption = "Dynamics")
+            ggsave(paste0("output/auxin/balloon_plot_timing_rep", rep, "_", tp, "_", condition, ".pdf"), width = 4, height = 4)
         }
     }
 }

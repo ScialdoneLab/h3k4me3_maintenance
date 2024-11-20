@@ -15,6 +15,7 @@ source("scripts/settings.R")
 
 ## Load data
 ```{r}
+load("data/processed/genome.RData")
 load("data/processed/rna_dynamics.RData")
 load("data/processed/chip_dynamics.RData")
 
@@ -118,13 +119,38 @@ for (rep in c("I", "II")) {
                             comp_dyns[[intersection_name]] <- intersect(chip_dyns[[chip_dyn]], rna_dyns[[rna_dyn]])
                         }
                     }
-                } else if(dyns == "rna_timing"){
+                } else if (dyns == "rna_timing") {
                     comp_dyns <- rna_dyns_timing
                 }
 
                 plot_balloonplot(x_dyns = comp_dyns, y_dyns = de_list, limit = 200, x_caption = paste(dyns, "dynamics"), y_caption = "RNA expression")
                 ggsave(paste0("output/morpholinos/balloon_plot_zygotic_rep", rep, "_", dyns, "_", tp, "_", condition, ".pdf"), width = 4, height = 4)
             }
+        }
+    }
+}
+```
+
+## Balloon plots of zygotic timing
+```{r warning=FALSE}
+tps <- c("1hr", "2hr", "3hr")
+conditions <- c("Cxxc1", "Kmt2b")
+
+for (rep in c("I", "II")) {
+    for (tp in tps) {
+        for (condition in conditions) {
+            de_list <- get_de_list(morpholino_dir, rep,
+                de_timepoints <- tp,
+                de_conditions <- condition,
+                background = unique(unlist(chip_dyns))
+            )
+
+            comp_dyns <- lapply(chip_dyns[names(chip_dyns) %in% c("Kept", "Gained", "Absent")], function(x) intersect(x, c(rna_dyns$GZ, rna_dyns$ZS)))
+            comp_dyns <- lapply(comp_dyns, function(x) intersect(x, de_list$down))
+            names(comp_dyns) <- paste(names(comp_dyns), "& Zygotic")
+
+            plot_balloonplot(x_dyns = rna_dyns_timing, y_dyns = comp_dyns, limit = 200, x_caption = "RNA timing", y_caption = "Dynamics")
+            ggsave(paste0("output/morpholinos/balloon_plot_timing_rep", rep, "_", tp, "_", condition, ".pdf"), width = 4, height = 4)
         }
     }
 }
