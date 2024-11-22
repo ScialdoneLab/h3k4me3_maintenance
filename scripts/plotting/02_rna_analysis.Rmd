@@ -326,7 +326,7 @@ ggviolin(plot_data, x="Time", y="Expression", fill="Category", add="boxplot", ad
 
 ## Balloon plot
 ```{r}
-plot_balloonplot(x_dyns=rna_dyns_timing, y_dyns=rna_dyns, limit=200, remove_dyns=c("ND", "NonZygotic"), x_caption="ZGA Timing", y_caption="RNA dynamics")
+plot_balloonplot(x_dyns=rna_dyns_timing, y_dyns=rna_dyns, limit=150, remove_dyns=c("ND", "NonZygotic"), x_caption="ZGA Timing", y_caption="RNA dynamics")
 ggsave('output/rna/rna_timing_balloon_plot.pdf', width=5, height=3)
 ```
 

@@ -21,11 +21,11 @@ load(paste0("data/processed/h3k4me3_data_sperm_", sperm_data, ".RData"))
 
 ## Balloon plots
 ```{r message=FALSE, warning=FALSE, fig.height=3, fig.width=5}
-plot_balloonplot(rna_dyns[names(rna_dyns) != "ND"], chip_dyns[names(chip_dyns) != "Absent"], limit=50, x_caption="RNA expression", y_caption="H3K4me3")
+plot_balloonplot(rna_dyns[names(rna_dyns) != "ND"], chip_dyns[names(chip_dyns) != "Absent"], limit=150, x_caption="RNA expression", y_caption="H3K4me3")
 ggsave('output/rna_chip/rna_chip_balloon_plot.pdf', width=5, height=3)
 ```
 ```{r message=FALSE, warning=FALSE, fig.height=3, fig.width=5}
-plot_balloonplot(rna_dyns_timing, chip_dyns, limit=100, x_caption="RNA expression", y_caption="H3K4me3", remove_dyns=c("NonZygotic", "Absent"))
+plot_balloonplot(rna_dyns_timing, chip_dyns, limit=150, x_caption="RNA expression", y_caption="H3K4me3", remove_dyns=c("NonZygotic", "Absent"))
 ggsave('output/rna_chip/rna_chip_timing_balloon_plot.pdf', width=5, height=3)
 ```
 
