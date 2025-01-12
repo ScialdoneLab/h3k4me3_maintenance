@@ -155,3 +155,436 @@ for (rep in c("I", "II")) {
     }
 }
 ```
+
+# Meghana analysis
+```{r}
+se <- readRDS(paste0(morpholino_dir, "se_metadataplus.rds"))
+
+files <- list.files(morpholino_dir, pattern = "^res_.*Ctrl_MO.*\\.rds$", full.names = TRUE)
+data_list <- lapply(files, readRDS)
+
+samplenames <- read.csv("data/raw/morpholinos/MO-samplenames.csv", header = FALSE)
+names(data_list) <- samplenames$V1
+
+geneIDs <- data.frame(rowData(se)[ ,2])
+rownames(geneIDs) <- rownames(rowData(se))
+colnames(geneIDs) <- "Gene"
+```
+
+## PCA
+```{r}
+secoldata <- as.data.frame(colData(se))
+no_wdr <- secoldata[secoldata$treatment != "Wdr5 MO", ]
+no_wdr <- no_wdr[7:78, ]
+
+no_wdr_ids <- secoldata[secoldata$treatment != "Wdr5 MO", ]$Sample_NameLIMS
+no_wdr_ids <- no_wdr_ids[7:78]                          #remove the 256c cell samples
+
+no_wdr_mat <- assays(se)$counts
+colnames(no_wdr_mat) <- se$Sample_NameLIMS
+no_wdr_mat <- no_wdr_mat[ ,no_wdr_ids]
+
+mat <- log2(no_wdr_mat+1)
+mat <- mat[apply(mat,1,var)>0,]
+pca <- prcomp(t(mat))
+
+pca_var <- pca$sdev^2
+pca_ve <- pca_var / sum(pca_var)
+round(pca_ve*100, digits = 2)
+
+no_wdr$pca <- paste0("Rep", no_wdr$experiment, ": ", no_wdr$timepoint)
+class <- factor(no_wdr$pca)
+class.cols <- c("cadetblue3", "coral3", "darkolivegreen3", "cadetblue4", "coral4", "darkolivegreen")
+
+pdf("output/morpholinos/pca.pdf", width = 9, height = 7)
+
+par(mar=c(4,4,2,8)+0.1, xpd=TRUE)
+plot(pca$x, pch=16, col=class.cols[class], cex=1.5,
+     xlab = paste0("PC1: ", round(pca_ve*100, digits = 2)[1], "%"),
+     ylab = paste0("PC2: ", round(pca_ve*100, digits = 2)[2], "%"))
+legend("topright", inset=c(-0.45,0), levels(class), fill=class.cols)
+
+dev.off()
+```
+
+## Plot DEG counts
+```{r}
+upreg <- list()
+downreg <- list()
+for (i in 1:length(data_list))  {
+  data_list[[i]] <- merge(as.data.frame(data_list[[i]]), geneIDs, by = 0)
+  upreg[[i]] <- subset(data_list[[i]], log2FoldChange > 0 & padj < 0.05)
+  downreg[[i]] <- subset(data_list[[i]], log2FoldChange < 0 & padj < 0.05)
+}
+names(upreg) <- samplenames$V1
+names(downreg) <- samplenames$V1
+
+## Make a df counting all misregulated genes
+
+upreg_length <- lapply(upreg, nrow)
+downreg_length <- lapply(downreg, nrow)
+DEGcount_df1 <- data.frame(Condition = samplenames$V1,
+                          Count = unlist(upreg_length, use.names = FALSE),
+                          Effect = "Upregulated"
+)
+
+DEGcount_df2 <- data.frame(Condition = samplenames$V1,
+                          Count = unlist(downreg_length, use.names = FALSE),
+                          Effect = "Downregulated"
+)
+
+DEGcount_df <- rbind(DEGcount_df1, DEGcount_df2)
+
+DEGcount_df <- DEGcount_df %>%
+  mutate(
+    Replicate = rep(rep(c("I", "II"), each = 9), times = 2),
+    Treatment = rep(rep(c("Cxxc1 MO", "Kmt2b MO", "Wdr5 MO"), times = 6), times = 2),
+    Timepoint = rep(rep(c("5.5hr", "6.5hr", "7.5hr"), each = 3, times = 2), times = 2)
+  )
+
+# Filter out Wdr5 MO
+filtered_df <- DEGcount_df %>%
+  filter(Treatment != "Wdr5 MO")
+
+order <- c("7.5hr", "6.5hr", "5.5hr")
+cols_degs <- c("Upregulated" = "red3", "Downregulated" = "blue4")
+
+#RepI
+filtered_df_rep1 <- filtered_df %>%
+  filter(Replicate == "I")
+
+b1 <- ggplot(filtered_df_rep1, aes(fill = Effect, y = Count, x = factor(Timepoint, levels = order))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  facet_wrap(~Treatment, ncol = 1) +
+  scale_fill_manual(values = cols_degs) +
+  ggtitle("DEG Count - Replicate I") +
+  ylab("Number of genes") +
+  xlab("Time after pre-ZGA") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  coord_flip() +
+  theme_pubr()
+
+pdf("output/morpholinos/DEGcount-rep1.pdf", width=4, height=5)
+plot(b1)
+dev.off()
+
+#RepII
+filtered_df_rep2 <- filtered_df %>%
+  filter(Replicate == "II")
+
+b2 <- ggplot(filtered_df_rep2, aes(fill = Effect, y = Count, x = factor(Timepoint, levels = order))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  facet_wrap(~Treatment, ncol = 1) +
+  scale_fill_manual(values = cols_degs) +
+  ggtitle("DEG Count - Replicate II") +
+  ylab("Number of genes") +
+  xlab("Time after pre-ZGA") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  coord_flip() +
+  theme_pubr()
+
+pdf("output/morpholinos/DEGcount-rep2.pdf", width=4, height=5)
+plot(b2)
+dev.off()
+```
+
+## Overlapping downregulated genes across replicates
+```{r}
+alldown <- list()
+Icxxc1 <- unique(c(downreg$Cxxc1_1hr_I$Gene, downreg$Cxxc1_2hr_I$Gene, downreg$Cxxc1_3hr_I$Gene))
+IIcxxc1 <- unique(c(downreg$Cxxc1_1hr_II$Gene, downreg$Cxxc1_2hr_II$Gene, downreg$Cxxc1_3hr_II$Gene))
+Ikmt2b <- unique(c(downreg$Kmt2b_1hr_I$Gene, downreg$Kmt2b_2hr_I$Gene, downreg$Kmt2b_3hr_I$Gene))
+IIkmt2b <- unique(c(downreg$Kmt2b_1hr_II$Gene, downreg$Kmt2b_2hr_II$Gene, downreg$Kmt2b_3hr_II$Gene))
+ 
+alldown <- list(Icxxc1, IIcxxc1, Ikmt2b, IIkmt2b)
+names(alldown) <- c("Icxxc1", "IIcxxc1", "Ikmt2b", "IIkmt2b")
+
+GS <- data.frame(Gene = rna_dyns$GS, Group = "3-GS")
+GZ <- data.frame(Gene = rna_dyns$GZ, Group = "5-GZ")
+ZS <- data.frame(Gene = rna_dyns$ZS, Group = "4-ZS")
+ND <- data.frame(Gene = rna_dyns$ND, Group = "2-ND")
+UA <- data.frame(Gene = setdiff(allgenes$gene_id, c(rna_dyns$GS, rna_dyns$GZ, rna_dyns$ZS, rna_dyns$ND)), Group = "1-UA")
+
+colnames(GS) <- c("Gene", "Group")
+colnames(GZ) <- c("Gene", "Group")
+colnames(ZS) <- c("Gene", "Group")
+colnames(ND) <- c("Gene", "Group")
+colnames(UA) <- c("Gene", "Group")
+
+zyg <- rbind(ZS, GZ)
+colnames(zyg) <- c("Gene", "Group")
+
+geneIDs_df <- data.frame(Gene = geneIDs$Gene, GeneID = rownames(geneIDs))
+zyg <- merge(geneIDs_df, zyg, by = "Gene", all.x = F, all.y = T)
+
+A <- union(alldown$IIcxxc1, alldown$IIkmt2b)
+B <- union(alldown$Icxxc1, alldown$Ikmt2b)
+
+Aonly <- length(setdiff(A, B))
+  Bonly <- length(setdiff(B, A))
+  AandB <- length(intersect(A, B))
+  fit <- euler(c("RepI" = Aonly, "RepII" = Bonly,"RepI&RepII" = AandB))
+  
+  pdf(paste0("output/morpholinos/Downreg-overlap-across-reps.pdf"), width = 3, height = 3)
+  plot(fit, quantities = TRUE, fills = c("lightskyblue2", "lightblue4"), edges = "white")
+  dev.off()
+```
+
+## Volcano plot for RNA groups
+```{r}
+rna_groups <- rbind(GS, GZ, ZS, ND, UA)
+rna_groups2 <- merge(geneIDs_df, rna_groups, by = "Gene")
+
+cols_rna_clusters <- c("3-GS"="#009988", "5-GZ"="#EE7733", "4-ZS" = "#6699CC", "2-ND" = "#666666", "1-UA" = "#000000")
+
+cols_rna_volcano <- c("Other" = "gray", "3-GS"="#009988", "5-GZ" = "#EE7733", "4-ZS" = "#6699CC")
+
+colnames(rna_groups2) <- c("Gene", "Row.names", "Group")
+
+for (i in 1:length(data_list))  {
+  vol <- merge(data_list[[i]], rna_groups2, by = "Row.names")
+
+data <- vol %>% arrange(Group)
+data$Group[data$Group == "2-ND"] <- "Other"
+data$Group[data$Group == "1-UA"] <- "Other"
+data$Group <- factor(data$Group, levels = c("Other", "3-GS", "4-ZS", "5-GZ"))
+volcano <- ggplot(data, aes(x = log2FoldChange, y = -log10(pvalue), col = Group, size = Group)) + 
+    geom_point(show.legend = TRUE) +
+    theme_pubr() +
+    geom_vline(xintercept = 0, col = "#5A5A5A", linetype = 'dashed') +   
+    geom_hline(yintercept = -log10(0.05), col = "#5A5A5A", linetype = 'dashed') + 
+    ggtitle(names(data_list[i])) +
+    coord_cartesian(ylim = c(0, 20), xlim = c(-5, 5)) + 
+    labs(x = expression("log"[2]*"FC"), y = expression("-log"[10]*"p-value")) + 
+    scale_color_manual(values = cols_rna_volcano, labels = c("Other" = "Other", "3-GS" = "3-GS", "4-ZS" = "4-ZS", "5-GZ" = "5-GZ")) + 
+    scale_x_continuous(breaks = seq(-10, 10, 2)) +
+    scale_size_manual(values = c("Other" = 0.5, "3-GS" = 1, "4-ZS" = 1, "5-GZ" = 1)) +
+    guides(size = "none")
+  
+  pdf(paste0("output/morpholinos/Volcano-RNAgroups-col-", names(data_list[i]),".pdf"), width=4, height=3.3)
+  plot(volcano)
+  dev.off()
+  }
+```
+
+## Venns for overlapping downregulated zygotic genes across conditions
+```{r}
+##RepI
+
+Cxxc1 <- alldown$Icxxc1[alldown$Icxxc1 %in% zyg$Gene]
+Kmt2b <- alldown$Ikmt2b[alldown$Ikmt2b %in% zyg$Gene]
+AandB <- length(intersect(Cxxc1, Kmt2b))
+Aonly <- length(setdiff(Cxxc1, Kmt2b))
+Bonly <- length(setdiff(Kmt2b, Cxxc1))
+
+fit <- euler(c("Cxxc1" = Aonly, "Kmt2b" = Bonly, "Cxxc1&Kmt2b" = AandB))
+
+pdf("output/morpholinos/Venn-zyg-overlaps-down-repII.pdf", width = 3, height = 3)
+plot(fit, quantities = TRUE,
+     fills = c("#EEB759", "#173A5D"),
+edges = "white")
+dev.off()
+
+##RepII
+
+Cxxc1 <- alldown$IIcxxc1[alldown$IIcxxc1 %in% zyg$Gene]
+Kmt2b <- alldown$IIkmt2b[alldown$IIkmt2b %in% zyg$Gene]
+AandB <- length(intersect(Cxxc1, Kmt2b))
+Aonly <- length(setdiff(Cxxc1, Kmt2b))
+Bonly <- length(setdiff(Kmt2b, Cxxc1))
+
+fit <- euler(c("Cxxc1" = Aonly, "Kmt2b" = Bonly, "Cxxc1&Kmt2b" = AandB))
+
+pdf("output/morpholinos/Venn--zyg-overlaps-down-repII.pdf", width = 3, height = 3)
+plot(fit, quantities = TRUE,
+     fills = c("#EEB759", "#173A5D"),
+edges = "white")
+dev.off()
+```
+
+## Plot DEG counts for zygotic genes
+```{r}
+cols_degs <- c("Upregulated" = "red3", "Downregulated" = "blue4", "Unchanged" = "grey")
+
+degcount <- list()
+data_list_zyg <- list()
+
+for (i in 1:length(data_list))  {
+  data_list_zyg[[i]] <- data_list[[i]][data_list[[i]]$Row.names %in% zyg$GeneID, ]
+  degcount[[i]] <- data.frame(Condition = names(data_list[i]))
+  degcount[[i]]$Upregulated <- dim(subset(data_list_zyg[[i]], log2FoldChange > 0 & padj < 0.05))[1]
+  degcount[[i]]$Downregulated <- dim(subset(data_list_zyg[[i]], log2FoldChange < 0 & padj < 0.05))[1]
+  degcount[[i]]$Unchanged <- dim(zyg)[1]-degcount[[i]]$Downregulated-degcount[[i]]$Upregulated
+  print(degcount[[i]]$Downregulated+degcount[[i]]$Upregulated+degcount[[i]]$Unchanged)
+  }
+
+##RepI
+
+degcount <- do.call(rbind, degcount)
+degcount <- degcount %>%
+    filter(!startsWith(Condition, "Wdr5"))
+
+degcount <- degcount %>%
+    filter(endsWith(Condition, "_I"))
+
+degcount$Treatment <- rep(c("Cxxc1", "Kmt2b"), times = 3)
+degcount$Timepoint <- c(rep("5.5hr", times = 2), rep("6.5hr", times = 2), rep("7.5hr", times = 2))
+
+degcount_melt <- melt(degcount, id = c(1,5,6), measure = 2:4)
+degcount_melt$variable <- factor(degcount_melt$variable, levels = c("Unchanged", "Upregulated", "Downregulated"))
+degcount_melt$Timepoint <- factor(degcount_melt$Timepoint, levels = c("7.5hr", "6.5hr", "5.5hr"))
+
+p1 <- ggplot(degcount_melt, aes(fill=variable, y=value, x=Timepoint)) + 
+    geom_bar(position="fill", stat="identity",  width = .7, colour="black", lwd=0.1) +
+    geom_text(aes(label = ifelse(value>100, value, "")), size=5, position = "fill", vjust = 0.5, colour = "white") +
+    facet_wrap(~Treatment, ncol = 1) +
+    scale_fill_manual(values = cols_degs) +
+    ggtitle("DEG Count") +
+    ylab("Number of genes") +
+    xlab("Time after pre-ZGA") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    coord_flip() +
+    theme_pubr()
+
+pdf(paste0("output/morpholinos/DEGcount-zyg-repII.pdf"), width=3.5, height=3.5)
+plot(p1)
+dev.off()
+
+#RepII
+
+degcount <- list()
+data_list_zyg <- list()
+
+for (i in 1:length(data_list))  {
+  #data_list[[i]] <- merge(as.data.frame(data_list[[i]]), geneIDs, by = 0)
+  data_list_zyg[[i]] <- data_list[[i]][data_list[[i]]$Row.names %in% zyg$GeneID, ]
+  degcount[[i]] <- data.frame(Condition = names(data_list[i]))
+  degcount[[i]]$Upregulated <- dim(subset(data_list_zyg[[i]], log2FoldChange > 0 & padj < 0.05))[1]
+  degcount[[i]]$Downregulated <- dim(subset(data_list_zyg[[i]], log2FoldChange < 0 & padj < 0.05))[1]
+  degcount[[i]]$Unchanged <- dim(zyg)[1]-degcount[[i]]$Downregulated-degcount[[i]]$Upregulated
+  print(degcount[[i]]$Downregulated+degcount[[i]]$Upregulated+degcount[[i]]$Unchanged)
+}
+
+degcount <- do.call(rbind, degcount)
+degcount <- degcount %>%
+    filter(!startsWith(Condition, "Wdr5"))
+
+degcount <- degcount %>%
+    filter(endsWith(Condition, "_II"))
+
+degcount$Treatment <- rep(c("Cxxc1", "Kmt2b"), times = 3)
+degcount$Timepoint <- c(rep("5.5hr", times = 2), rep("6.5hr", times = 2), rep("7.5hr", times = 2))
+
+degcount_melt <- melt(degcount, id = c(1,5,6), measure = 2:4)
+degcount_melt$variable <- factor(degcount_melt$variable, levels = c("Unchanged", "Upregulated", "Downregulated"))
+degcount_melt$Timepoint <- factor(degcount_melt$Timepoint, levels = c("7.5hr", "6.5hr", "5.5hr"))
+
+p1 <- ggplot(degcount_melt, aes(fill=variable, y=value, x=Timepoint)) + 
+    geom_bar(position="fill", stat="identity",  width = .7, colour="black", lwd=0.1) +
+    geom_text(aes(label = ifelse(value>100, value, "")), size=5, position = "fill", vjust = 0.5, colour = "white") +
+    facet_wrap(~Treatment, ncol = 1) +
+    scale_fill_manual(values = cols_degs) +
+    ggtitle("DEG Count") +
+    ylab("Number of genes") +
+    xlab("Time after pre-ZGA") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    coord_flip() +
+    theme_pubr()
+
+pdf(paste0("output/morpholinos/DEGcount-zyg-repII.pdf"), width=3.5, height=3.5)
+plot(p1)
+dev.off()
+```
+
+## Pluripotency gene expression
+```{r}
+tpms <- as.data.frame(assay(se,2))
+colnames(tpms) <- se$FID_comment
+tpms2 <- tpms[ ,7:96]
+sox3L <- tpms2["XBXL10_1g35158", ]
+sox3S <- tpms2["XBXL10_1g38013", ]
+pou5f32L <- tpms2["XBXL10_1g34225", ]
+pou5f32S <- tpms2["XBXL10_1g37504", ]
+
+pluri <- list(sox3L, sox3S, pou5f32L, pou5f32S)
+names(pluri) <- c("sox3L", "sox3S", "pou5f32L", "pou5f32S")
+
+pluridf <- list()
+for (i in 1:length(pluri)) {
+  rownames(pluri[[i]]) <- "TPM"
+  pluridf[[i]] <- data.frame(TPM = t(pluri[[i]]),
+                    Condition = rep(c("Kmt2b MO", "Cxxc1 MO", "Wdr5 MO", "Ctrl MO", "NI Ctrl"), times = 18),
+                    Timepoint = c(rep("T1", times = 30), rep("T2", times = 30), rep("T3", times = 30)),
+                    Rep = rep(c(rep("I", times = 15), rep("II", times = 15)), times = 3),
+                    Techrep = rep(c(rep("1", times = 5), rep("2", times = 5), rep("3", times = 5)), times = 6)
+  )
+  pluridf[[i]] <- cbind(pluridf[[i]], 
+                        Group = paste0(pluridf[[i]]$Condition, ".", pluridf[[i]]$Rep, ".", pluridf[[i]]$Techrep),
+                        Gene = names(pluri[i]))
+  pluridf[[i]] <- pluridf[[i]][pluridf[[i]]$Condition != "Wdr5 MO", ]
+  pluridf[[i]] <- pluridf[[i]][pluridf[[i]]$Condition != "NI Ctrl", ]
+}
+names(pluridf) <- c("sox3L", "sox3S", "pou5f32L", "pou5f32S")
+pluriall <- do.call(rbind, pluridf)
+
+for (i in 1:length(pluridf)) {
+  pluridf[[i]] <- pluridf[[i]] %>%
+    mutate(Control_Type = ifelse(Condition == "Ctrl MO", "Ctrl MO", "Treatment"))
+
+# Calculate the mean TPM of "Ctrl MO" for each Timepoint and Rep
+  control_means_new <- pluridf[[i]] %>%
+    filter(Control_Type == "Ctrl MO") %>%
+    group_by(Timepoint, Rep) %>%
+    summarize(control_mean_TPM = mean(TPM), .groups = "drop")
+
+# Join the control means back to the original dataframe
+  pluridf[[i]] <- pluridf[[i]] %>%
+    left_join(control_means_new, by = c("Timepoint", "Rep")) %>%
+    mutate(
+      TPM_adjusted = TPM / control_mean_TPM
+  )
+}
+
+pluri2 <- list("sox3" = rbind(pluridf[[1]], pluridf[[2]]),
+               "pou5f3" = rbind(pluridf[[3]], pluridf[[4]])
+)
+col <- c("Ctrl MO" = "#e1dcca","Kmt2b MO" = "#173a5d","Cxxc1 MO" = "#eeb759")
+
+for (i in 1:length(pluri2)) {
+  pluriplot <- ggplot(pluri2[[i]], aes(x = Condition, y = TPM_adjusted, color = Condition)) +
+    geom_jitter(aes(shape = interaction(Rep,Gene)), width = 0.2, size = 2) +
+    stat_summary(
+        fun = mean, 
+        fun.min = function(x) mean(x) - sd(x), 
+        fun.max = function(x) mean(x) + sd(x), 
+        geom = "errorbar", 
+        width = 0.2, 
+        color = "black"
+    ) +
+    stat_summary(
+        fun = mean, 
+        geom = "point", 
+        size = 3, 
+        color = "black", 
+        shape = 95
+    ) +
+    facet_wrap(~Timepoint) +
+    theme_bw() +
+    ylab("Gene expression (TPM)") +
+    ylim(0, 1.5) +
+    ggtitle(names(pluri2[i])) +
+    theme(axis.text.x = element_text(colour = "black")) +
+    theme(axis.text.y = element_text(colour = "black")) +
+    scale_shape_manual(values = c(16, 18, 1, 5)) +
+    stat_compare_means(
+        comparisons = list(c("Cxxc1 MO", "Ctrl MO"), c("Kmt2b MO", "Ctrl MO")),
+        method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"),
+        label.y = c(1.3,1.4)
+    ) +
+    scale_color_manual(values = col)
+  
+  pdf(paste0("output/morpholinos/", names(pluri2[i]), ".pdf"), width=7, height=3)
+  plot(pluriplot)
+  dev.off()
+}
+```

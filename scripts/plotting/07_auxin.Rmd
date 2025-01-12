@@ -231,3 +231,426 @@ for (rep in 2:3) {
     }
 }
 ```
+
+# Analysis Meghana
+```{r}
+se_1_2 <- readRDS(paste0(auxin_dir, "se_kal_reps_1_2.rds"))
+se_3_4 <- readRDS(paste0(auxin_dir, "se_kal_reps_3_4.rds"))
+
+se_1_2$condition[se_1_2$condition == "Control -IAA"] <- "Control-IAA"
+se_1_2$condition[se_1_2$condition == "Control +IAA"] <- "Control+IAA"
+se_1_2$condition[se_1_2$condition == "Treated +IAA"] <- "Treated+IAA"
+se_1_2$condition[se_1_2$condition == "Treated -IAA"] <- "Treated-IAA"
+se_1_2$condition[se_1_2$condition == "Wt -IAA"] <- "Wt-IAA"
+```
+
+## PCA plot
+```{r}
+se_1_2$pca <- paste0("Rep", se_1_2$experiment_set, ": ", se_1_2$time_point)
+mat1 <- log2(assays(se_1_2)$counts+1)
+colnames(mat1) <- c(1:90)
+se_3_4$pca <- paste0("Rep", se_3_4$experiment_set, ": ", se_3_4$time_point)
+mat2 <- log2(assays(se_3_4)$counts+1)
+colnames(mat2) <- c(91:180)
+
+mat <- merge(mat1, mat2, by = 0, all = TRUE)
+rownames(mat) <- mat$Row.names
+mat <- mat %>% replace(is.na(.), 0)
+mat <- as.matrix(mat[ ,47:136])
+
+mat <- mat[apply(mat,1,var)>0,]
+pca <- prcomp(t(mat))
+
+class <- factor(c(se_1_2$pca[46:90], se_3_4$pca[1:45]))
+class.cols <- c("cadetblue3", "coral1", "darkolivegreen3", "darkslategrey", "coral4", "darkolivegreen")
+
+pca_var <- pca$sdev^2
+pca_ve <- pca_var / sum(pca_var)
+round(pca_ve*100, digits = 2)
+
+pdf('output/auxin/pca.pdf', width = 4.7, height = 3.5)
+
+par(mar=c(4,4,2,8)+0.1, xpd=TRUE)
+plot(pca$x, pch=16, col=class.cols[class], cex=1.5,
+     xlab = paste0("PC1: ", round(pca_ve*100, digits = 2)[1], "%"),
+     ylab = paste0("PC2: ", round(pca_ve*100, digits = 2)[2], "%"))
+legend("topright", inset=c(-0.5,0), levels(class), fill=class.cols)
+
+dev.off()
+```
+
+## DEG analysis
+```{r}
+files <- list.files(auxin_dir, pattern = "^res_.*\\.rds$", full.names = TRUE)
+data_list <- lapply(files, readRDS)
+
+samplenames <- read.csv(paste0(auxin_dir, "Contrast2-samplenames-combined.csv"), header = TRUE)
+names(data_list) <- samplenames$Name
+
+geneIDs <- data.frame(rowData(se_1_2)[ ,2])
+rownames(geneIDs) <- rownames(rowData(se_1_2))
+colnames(geneIDs) <- "Gene"
+
+geneIDs_df <- data.frame(Gene = geneIDs$Gene, GeneID = rownames(geneIDs))
+
+upreg <- list()
+downreg <- list()
+for (i in 1:length(data_list))  {
+  data_list[[i]] <- merge(as.data.frame(data_list[[i]]), geneIDs, by = 0)
+  upreg[[i]] <- subset(data_list[[i]], log2FoldChange > 0 & padj < 0.05)
+  downreg[[i]] <- subset(data_list[[i]], log2FoldChange < 0 & padj < 0.05)
+}
+names(upreg) <- samplenames$Name
+names(downreg) <- samplenames$Name
+
+##Make a df counting all misregulated genes
+
+upreg_length <- lapply(upreg, nrow)
+downreg_length <- lapply(downreg, nrow)
+DEGcount_df1 <- data.frame(Condition = samplenames$Name,
+                          Count = unlist(upreg_length, use.names = FALSE),
+                          Effect = "Upregulated"
+)
+
+DEGcount_df2 <- data.frame(Condition = samplenames$Name,
+                          Count = unlist(downreg_length, use.names = FALSE),
+                          Effect = "Downregulated"
+)
+
+DEGcount_df <- rbind(DEGcount_df1, DEGcount_df2)
+
+order <- c("7.5hr", "6.5hr", "5.5hr")
+cols_degs <- c("Upregulated" = "red3", "Downregulated" = "blue4")
+
+DEGcount_df <- DEGcount_df %>%
+  mutate(
+    Replicate = rep(rep(c("I", "II", "III", "IV"), each = 6), times = 2),
+    Treatment = rep(c("mIAA", "pIAA"), times = 24),
+    Timepoint = rep(rep(c("5.5hr", "6.5hr", "7.5hr"), each = 2), times = 8)
+  )
+
+#RepI
+filtered_df_rep1 <- DEGcount_df %>%
+  filter(Replicate == "II")
+
+b1 <- ggplot(filtered_df_rep1, aes(fill=Effect, y=Count, x=factor(Timepoint, order))) + 
+    geom_bar(position="dodge", stat="identity") +
+    facet_wrap(~Treatment, ncol = 1) +
+    scale_fill_manual(values = cols_degs) +
+    ggtitle("DEG Count: RepI") +
+    ylab("Number of genes") +
+    xlab("Time after pre-ZGA") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    coord_flip() +
+    theme_pubr()
+
+pdf("output/auxin/DEGcount-repI.pdf", width=4, height=5)
+plot(b1)
+dev.off()
+
+#RepII
+filtered_df_rep2 <- DEGcount_df %>%
+  filter(Replicate == "III")
+
+b2 <- ggplot(filtered_df_rep2, aes(fill=Effect, y=Count, x=factor(Timepoint, order))) + 
+    geom_bar(position="dodge", stat="identity") +
+    facet_wrap(~Treatment, ncol = 1) +
+    scale_fill_manual(values = cols_degs) +
+    ggtitle("DEG Count: RepII") +
+    ylab("Number of genes") +
+    xlab("Time after pre-ZGA") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    coord_flip() +
+    theme_pubr()
+
+pdf("output/auxin/DEGcount-repII.pdf", width=4, height=5)
+plot(b2)
+dev.off()
+```
+
+## Volcano plot for RNA groups
+```{r}
+GS <- data.frame(Gene = rna_dyns$GS, Group = "3-GS")
+GZ <- data.frame(Gene = rna_dyns$GZ, Group = "5-GZ")
+ZS <- data.frame(Gene = rna_dyns$ZS, Group = "4-ZS")
+ND <- data.frame(Gene = rna_dyns$ND, Group = "2-ND")
+UA <- data.frame(Gene = setdiff(allgenes$gene_id, c(rna_dyns$GS, rna_dyns$GZ, rna_dyns$ZS, rna_dyns$ND)), Group = "1-UA")
+
+colnames(GS) <- c("Gene", "Group")
+colnames(GZ) <- c("Gene", "Group")
+colnames(ZS) <- c("Gene", "Group")
+colnames(ND) <- c("Gene", "Group")
+colnames(UA) <- c("Gene", "Group")
+
+rna_groups <- rbind(GS, GZ, ZS, ND, UA)
+rna_groups2 <- merge(geneIDs_df, rna_groups, by = "Gene")
+cols_rna_clusters <- c("3-GS"="#009988", "5-GZ"="#EE7733", "4-ZS" = "#6699CC", "2-ND" = "#666666", "1-UA" = "#000000")
+cols_rna_volcano <- c("Other" = "gray", "3-GS"="#009988", "5-GZ" = "#EE7733", "4-ZS" = "#6699CC")
+colnames(rna_groups2) <- c("Gene", "Row.names", "Group")
+
+for (i in c(7:18))  {
+  vol <- merge(data_list[[i]], rna_groups2, by = "Row.names")
+
+data <- vol %>% arrange(Group)
+data$Group[data$Group == "2-ND"] <- "Other"
+data$Group[data$Group == "1-UA"] <- "Other"
+data$Group <- factor(data$Group, levels = c("Other", "3-GS", "4-ZS", "5-GZ"))
+volcano <- ggplot(data, aes(x = log2FoldChange, y = -log10(pvalue), col = Group, size = Group)) + 
+    ggrastr::geom_point_rast(show.legend = TRUE, raster.dpi = 500) +
+    theme_pubr() +
+    geom_vline(xintercept = 0, col = "#5A5A5A", linetype = 'dashed') +   
+    geom_hline(yintercept = -log10(0.05), col = "#5A5A5A", linetype = 'dashed') + 
+    ggtitle(names(data_list[i])) +
+    coord_cartesian(ylim = c(0, 20), xlim = c(-5, 5)) + 
+    labs(x = expression("log"[2]*"FC"), y = expression("-log"[10]*"p-value")) + 
+    scale_color_manual(values = cols_rna_volcano, labels = c("Other" = "Other", "3-GS" = "3-GS", "4-ZS" = "4-ZS", "5-GZ" = "5-GZ")) + 
+    scale_x_continuous(breaks = seq(-10, 10, 2)) +
+    scale_size_manual(values = c("Other" = 0.5, "3-GS" = 1, "4-ZS" = 1, "5-GZ" = 1)) +
+    guides(size = "none")
+  
+  pdf(paste0("output/auxin/Volcano-RNAgroups-col-", names(data_list[i]),".", ".pdf"), width=4, height=3.3)
+  plot(volcano)
+  dev.off()
+  }
+
+```
+
+## Overlapping downregulated genes across replicates
+```{r}
+alldown <- list()
+for (i in 1:4) {
+  alldown[[i]] <- unique(c(downreg[[6*(i-1)+1]]$Gene, downreg[[6*(i-1)+3]]$Gene, downreg[[6*(i-1)+5]]$Gene))
+  alldown[[i+4]] <- unique(c(downreg[[6*(i-1)+2]]$Gene, downreg[[6*(i-1)+4]]$Gene, downreg[[6*(i-1)+6]]$Gene))
+}
+names(alldown) <- c("mIAA_I", "mIAA_II", "mIAA_III", "mIAA_IV", 
+                  "pIAA_I", "pIAA_II", "pIAA_III", "pIAA_IV")
+
+#Window
+A <- alldown$pIAA_II
+B <- alldown$pIAA_III
+
+Aonly <- length(setdiff(A, B))
+  Bonly <- length(setdiff(B, A))
+  AandB <- length(intersect(A, B))
+  fit <- euler(c("RepI" = Aonly, "RepII" = Bonly,"RepI&RepII" = AandB))
+  
+  pdf(paste0("output/auxin/Window-downreg-overlap-across-reps.pdf"), width = 3, height = 3)
+  plot(fit, quantities = TRUE, fills = c("lightskyblue2", "lightblue4"), edges = "white")
+  dev.off()
+  
+#Persistent
+A <- alldown$mIAA_II
+B <- alldown$mIAA_III
+
+Aonly <- length(setdiff(A, B))
+  Bonly <- length(setdiff(B, A))
+  AandB <- length(intersect(A, B))
+  fit <- euler(c("RepI" = Aonly, "RepII" = Bonly,"RepI&RepII" = AandB))
+  
+  pdf(paste0("output/auxin/Persistent-downreg-overlap-across-reps.pdf"), width = 3, height = 3)
+  plot(fit, quantities = TRUE, fills = c("lightskyblue2", "lightblue4"), edges = "white")
+  dev.off()
+```
+
+## Overlapping downregulated zygotic genes across conditions
+```{r}
+zyg <- rbind(ZS, GZ)
+colnames(zyg) <- c("Gene", "Group")
+
+zyg <- merge(geneIDs_df, zyg, by = "Gene", all.x = F, all.y = T)
+
+#Window
+A <- intersect(alldown$pIAA_II, zyg$Gene)
+B <- intersect(alldown$mIAA_II, zyg$Gene)
+
+Aonly <- length(setdiff(A, B))
+  Bonly <- length(setdiff(B, A))
+  AandB <- length(intersect(A, B))
+  fit <- euler(c("Window" = Aonly, "Persistent" = Bonly,"Window&Persistent" = AandB))
+  
+  pdf(paste0("output/auxin/Downreg-zygotic-overlap-across-conditions-RepI.pdf"), width = 3, height = 3)
+  plot(fit, quantities = TRUE, fills = c("#8D4031", "#CE5D46"), edges = "white")
+  dev.off()
+  
+#Persistent
+A <- intersect(alldown$pIAA_III, zyg$Gene)
+B <- intersect(alldown$mIAA_III, zyg$Gene)
+
+Aonly <- length(setdiff(A, B))
+  Bonly <- length(setdiff(B, A))
+  AandB <- length(intersect(A, B))
+  fit <- euler(c("Window" = Aonly, "Persistent" = Bonly,"Window&Persistent" = AandB))
+  
+  pdf(paste0("output/auxin/Downreg-zygotic-overlap-across-conditions-RepII.pdf"), width = 3, height = 3)
+  plot(fit, quantities = TRUE, fills = c("#8D4031", "#CE5D46"), edges = "white")
+  dev.off()
+```
+
+## Plot DEG counts for zygotic genes
+```{r}
+cols_degs <- c("Upregulated" = "red3", "Downregulated" = "blue4", "Unchanged" = "grey")
+
+degcount <- list()
+data_list_zyg <- list()
+
+for (i in 1:length(data_list))  {
+  data_list_zyg[[i]] <- data_list[[i]][data_list[[i]]$Row.names %in% zyg$GeneID, ]
+  degcount[[i]] <- data.frame(Condition = names(data_list[i]))
+  degcount[[i]]$Upregulated <- dim(subset(data_list_zyg[[i]], log2FoldChange > 0 & padj < 0.05))[1]
+  degcount[[i]]$Downregulated <- dim(subset(data_list_zyg[[i]], log2FoldChange < 0 & padj < 0.05))[1]
+  degcount[[i]]$Unchanged <- dim(zyg)[1]-degcount[[i]]$Downregulated-degcount[[i]]$Upregulated
+  #print(degcount[[i]]$Downregulated+degcount[[i]]$Upregulated+degcount[[i]]$Unchanged)
+}
+
+degcount <- do.call(rbind, degcount)
+degcount$Treatment <- rep(c("Persistent", "Window"), times = 3)
+degcount$Timepoint <- c(rep("5.5hr", times = 2), rep("6.5hr", times = 2), rep("7.5hr", times = 2))
+
+##RepI
+
+degcount_rep1 <- degcount %>%
+    filter(endsWith(Condition, "_R2"))
+
+degcount_melt <- melt(degcount_rep1, id = c(1,5,6), measure = 2:4)
+degcount_melt$variable <- factor(degcount_melt$variable, levels = c("Unchanged", "Upregulated", "Downregulated"))
+degcount_melt$Timepoint <- factor(degcount_melt$Timepoint, levels = c("7.5hr", "6.5hr", "5.5hr"))
+
+pdf(paste0("output/auxin/DEGcount-zyg-repI.pdf"), width=4, height=3.5)
+ggplot(degcount_melt, aes(fill=variable, y=value, x=Timepoint)) + 
+    geom_bar(position="fill", stat="identity",  width = .7, colour="black", lwd=0.1) +
+    geom_text(aes(label = ifelse(value>30, value, "")), size=5, position = "fill", vjust = 0.5, colour = "white") +
+    facet_wrap(~Treatment, ncol = 1) +
+    scale_fill_manual(values = cols_degs) +
+    ggtitle("DEG Count") +
+    ylab("Number of genes") +
+    xlab("Time after pre-ZGA") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    coord_flip() +
+    theme_pubr()
+dev.off()
+
+##RepII
+
+degcount_rep2 <- degcount %>%
+    filter(endsWith(Condition, "_R3"))
+
+degcount_melt <- melt(degcount_rep2, id = c(1,5,6), measure = 2:4)
+degcount_melt$variable <- factor(degcount_melt$variable, levels = c("Unchanged", "Upregulated", "Downregulated"))
+degcount_melt$Timepoint <- factor(degcount_melt$Timepoint, levels = c("7.5hr", "6.5hr", "5.5hr"))
+
+pdf(paste0("output/auxin/DEGcount-zyg-repII.pdf"), width=4, height=3.5)
+ggplot(degcount_melt, aes(fill=variable, y=value, x=Timepoint)) + 
+    geom_bar(position="fill", stat="identity",  width = .7, colour="black", lwd=0.1) +
+    geom_text(aes(label = ifelse(value>30, value, "")), size=5, position = "fill", vjust = 0.5, colour = "white") +
+    facet_wrap(~Treatment, ncol = 1) +
+    scale_fill_manual(values = cols_degs) +
+    ggtitle("DEG Count") +
+    ylab("Number of genes") +
+    xlab("Time after pre-ZGA") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    coord_flip() +
+    theme_pubr()
+dev.off()
+```
+
+## Pluripotency gene expression
+```{r}
+aa <- as.data.frame(assay(se_1_2,2))
+colnames(aa) <- se_1_2$FID_comment
+
+bb <- as.data.frame(assay(se_3_4,2))
+colnames(bb) <- se_3_4$FID_comment
+ 
+tpms <- merge(aa, bb, by = 0, all.x = T, all.y = T)
+tpms2 <- tpms[ ,47:136]
+ 
+rownames(tpms) <- tpms$Row.names
+rownames(tpms2) <- rownames(tpms)
+sox3L <- tpms2["XBXL10_1g35158", ]
+sox3S <- tpms2["XBXL10_1g38013", ]
+pou5f32L <- tpms2["XBXL10_1g34225", ]
+pou5f32S <- tpms2["XBXL10_1g37504", ]
+
+pluri <- list(sox3L, sox3S, pou5f32L, pou5f32S)
+names(pluri) <- c("sox3L", "sox3S", "pou5f32L", "pou5f32S")
+
+pluridf <- list()
+for (i in 1:length(pluri)) {
+    rownames(pluri[[i]]) <- "TPM"
+    pluridf[[i]] <- data.frame(TPM = t(pluri[[i]]),
+                               Condition = c(rep("Treated-IAA", times = 3), rep("Control-IAA", times = 3), rep("Wt-IAA", times = 3), rep("Treated+IAA", times = 3), rep("Control+IAA", times =3)),
+                               Timepoint = rep(c(rep("T1", times = 15), rep("T2", times = 15), rep("T3", times = 15)), times = 2),
+                               Rep = c(rep("I", times = 45), rep("II", times = 45)),
+                               Techrep = rep(c("1", "2", "3"), times = 30)
+    )
+    pluridf[[i]] <- cbind(pluridf[[i]], 
+                          Group = paste0(pluridf[[i]]$Condition, ".", pluridf[[i]]$Rep, ".", pluridf[[i]]$Techrep),
+                          Gene = names(pluri[i]))
+    pluridf[[i]] <- pluridf[[i]][pluridf[[i]]$Condition != "Wt-IAA", ]
+    #write.csv(pluridf[[i]], paste0("auxin-", names(pluri[i]), ".csv"), row.names = TRUE)
+    pluridf[[i]]$Condition <- factor(pluridf[[i]]$Condition, levels = c("Control+IAA", "Treated+IAA", "Control-IAA","Treated-IAA"))
+}
+names(pluridf) <- c("sox3L", "sox3S", "pou5f32L", "pou5f32S")
+pluriall <- do.call(rbind, pluridf)
+
+for (i in 1:length(pluridf)) {
+  pluridf[[i]] <- pluridf[[i]] %>%
+  mutate(Control_Type = ifelse(grepl("\\+IAA", Condition), "Control+IAA", "Control-IAA"))
+
+# Calculate the mean of Control+IAA and Control-IAA for each timepoint
+control_means <- pluridf[[i]] %>%
+  filter(grepl("Control", Condition)) %>%
+  group_by(Timepoint, Control_Type, Rep) %>%
+  summarize(control_mean_TPM = mean(TPM), .groups = "drop")
+
+# Join the control means back to the original dataframe
+pluridf[[i]] <- pluridf[[i]] %>%
+  mutate(Control_Type = ifelse(grepl("\\+IAA", Condition), "Control+IAA", "Control-IAA")) %>%
+  left_join(control_means, by = c("Timepoint", "Control_Type", "Rep")) %>%
+  mutate(TPM_adjusted = TPM / control_mean_TPM)
+}
+
+pluri2 <- list("sox3" = rbind(pluridf[[1]], pluridf[[2]]),
+               "pou5f3" = rbind(pluridf[[3]], pluridf[[4]])
+)
+
+col <- c("Control+IAA" = "cadetblue4", "Treated+IAA" = "coral4", "Control-IAA" = "cadetblue3", "Treated-IAA" = "coral3")
+
+for (i in 1:length(pluri2)) {
+  pluriplot <- ggplot(pluri2[[i]], aes(x = Condition, y = TPM_adjusted, color = Condition)) +
+    geom_jitter(aes(shape = interaction(Rep,Gene)), width = 0.2, size = 2) +
+    stat_summary(
+        fun = mean, 
+        fun.min = function(x) mean(x) - sd(x), 
+        fun.max = function(x) mean(x) + sd(x), 
+        geom = "errorbar", 
+        width = 0.2, 
+        color = "black"
+    ) +
+    stat_summary(
+        fun = mean, 
+        geom = "point", 
+        size = 3, 
+        color = "black", 
+        shape = 95
+    ) +
+    facet_wrap(~Timepoint) +
+    theme_bw() +
+    ylab("Gene expression (TPM)") +
+    ylim(0, 1.5) +
+    ggtitle(names(pluri2[i])) +
+    theme(axis.text.x = element_text(colour = "black")) +
+    theme(axis.text.y = element_text(colour = "black")) +
+    scale_shape_manual(values = c(16, 18, 1, 5)) +
+    stat_compare_means(
+        comparisons = list(c("Treated+IAA", "Control+IAA"), c("Treated-IAA", "Control-IAA")),
+        method = "wilcox.test", label = "p.signif", method.args = list(alternative = "less"),
+        label.y = c(1.3,1.4)
+    ) +
+    scale_color_manual(values = col)
+  
+  pdf(paste0("output/auxin/", names(pluri2[i]), ".pdf"), width=7, height=3)
+  plot(pluriplot)
+  dev.off()
+}
+```
