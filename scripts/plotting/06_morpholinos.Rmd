@@ -24,6 +24,17 @@ se <- readRDS(paste0(morpholino_dir, "se_kal.rds"))
 
 mapnames <- se@elementMetadata@listData$name
 names(mapnames) <- se@elementMetadata@listData$id
+
+export_tpms <- function(se, rep){
+  se_rep <- se[, sapply(se@colData@listData$group, function(x) regmatches(x, regexpr("\\b(I{1,3})\\b", x))) == rep]
+  tpms <- se_rep@assays@data@listData$tpms
+  rownames(tpms) <- mapnames[rownames(tpms)]
+  colnames(tpms) <- se_rep@colData@listData$group
+  return(tpms)
+}
+
+write.csv(export_tpms(se, "I"), "data/processed/morpholino_tpms_rep1.csv")
+write.csv(export_tpms(se, "II"), "data/processed/morpholino_tpms_rep2.csv")
 ```
 
 ## Preprocessing

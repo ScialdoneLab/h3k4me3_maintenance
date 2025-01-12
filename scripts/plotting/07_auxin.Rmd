@@ -25,6 +25,19 @@ se_3_4 <- readRDS(paste0(auxin_dir, "se_kal_reps_3_4.rds"))
 
 mapnames <- se_1_2@elementMetadata@listData$name
 names(mapnames) <- se_1_2@elementMetadata@listData$id
+
+export_tpms <- function(se, rep){
+  se_rep <- se[, se@colData@listData$experiment_set == rep]
+  tpms <- se_rep@assays@data@listData$tpms
+  rownames(tpms) <- mapnames[rownames(tpms)]
+  colnames(tpms) <- se_rep@colData@listData$FID_comment
+  return(tpms)
+}
+
+write.csv(export_tpms(se_1_2, 1), "data/processed/auxin_tpms_rep1.csv")
+write.csv(export_tpms(se_1_2, 2), "data/processed/auxin_tpms_rep2.csv")
+write.csv(export_tpms(se_3_4, 3), "data/processed/auxin_tpms_rep3.csv")
+write.csv(export_tpms(se_3_4, 4), "data/processed/auxin_tpms_rep4.csv")
 ```
 
 ## Preprocessing

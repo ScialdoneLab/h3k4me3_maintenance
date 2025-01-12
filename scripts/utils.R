@@ -1,5 +1,5 @@
 packages <- c(
-  "here", "ggplot2", "ChIPpeakAnno", "reshape2", "AnnotationDbi", "eulerr", "PerformanceAnalytics", "factoextra", "chromstaR", "BSgenome",
+  "here", "ggplot2", "ChIPpeakAnno", "reshape2", "AnnotationDbi", "eulerr", "PerformanceAnalytics", "factoextra", "chromstaR", "BSgenome", "GenomicAlignments",
   "clusterProfiler", "org.Xl.eg.db", "simplifyEnrichment", "gridExtra", "grid", "plyr", "ggalluvial", "tidyr", "scales", "corrplot", "RColorBrewer", "ComplexUpset",
   "dplyr", "ggpubr", "Biostrings", "EnrichedHeatmap", "rtracklayer", "SummarizedExperiment", "Seurat", "circlize", "ComplexHeatmap", "reshape2", "ggrastr", "data.table"
 )
