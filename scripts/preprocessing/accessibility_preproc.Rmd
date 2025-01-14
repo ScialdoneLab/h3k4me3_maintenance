@@ -24,8 +24,8 @@ pre_zga_cov1 <- readBamFileAsGRanges(bamfile = paste0(accessibility_dir, "Dam_1_
 pre_zga_cov2 <- readBamFileAsGRanges(bamfile = paste0(accessibility_dir, "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam"), bamindex = paste0(accessibility_dir, "Dam_1_SLX-20130_AR009_s_1_r.sorted.bam.bai"))
 pre_zga_cov <- c(pre_zga_cov1, pre_zga_cov2)
 
-export.bw(coverage(pre_zga_cov1), con="data/processed/DamID_PreZGA_Rep1.bw")
-export.bw(coverage(pre_zga_cov2), con="data/processed/DamID_PreZGA_Rep2.bw")
+export.bw(coverage(pre_zga_cov1), con=paste0(accessibility_dir, "Dam_1_SLX-20130_AR008_s_1_r.bw"))
+export.bw(coverage(pre_zga_cov2), con=paste0(accessibility_dir, "Dam_1_SLX-20130_AR009_s_1_r.bw"))
 
 #Delete individual replicates
 rm(pre_zga_cov1, pre_zga_cov2)
