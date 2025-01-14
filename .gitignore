@@ -5,3 +5,6 @@
 *.log
 *.knit.md
 archive
+output
+data/raw
+data/processed
