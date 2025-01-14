@@ -121,7 +121,7 @@ dev.off()
 ## EnrichedHeatmap with accessibility split
 ```{r} 
 set.seed(123)
-accessibility_heatmap <- EnrichedHeatmap(accessibility_norm_mats[["Pre-ZGA"]],
+accessibility_heatmap <- EnrichedHeatmap(accessibility_norm_mats[["Pre-ZGA"]][chip_dfs[["Pre-ZGA"]]$peak,],
   use_raster = TRUE,
   heatmap_legend_param = list(title = expression("Accessibility [log"[2]*"]")),
   column_title = "Accessibility",
@@ -132,7 +132,7 @@ accessibility_heatmap <- EnrichedHeatmap(accessibility_norm_mats[["Pre-ZGA"]],
   top_annotation = HeatmapAnnotation(enrich = anno_enriched(axis_param = list(side = "left"), gp = gpar(col = 1)))
 )
 
-h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]],
+h3k4me3_heatmap <- EnrichedHeatmap(chip_norm_mats[["Pre-ZGA"]][chip_dfs[["Pre-ZGA"]]$peak,],
   use_raster = TRUE,
   heatmap_legend_param = list(title = expression("H3K4me3 [log"[2]*"]")),
   column_title = "H3K4me3",

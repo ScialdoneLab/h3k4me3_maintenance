@@ -22,6 +22,9 @@ load("data/processed/chip_dynamics.RData")
 morpholino_dir <- "data/raw/morpholinos/"
 se <- readRDS(paste0(morpholino_dir, "se_kal.rds"))
 
+se <- se[, !grepl("Wdr5", se@colData@listData$group)]
+se <- se[, !grepl("256c Rep", se@colData@listData$group)]
+
 mapnames <- se@elementMetadata@listData$name
 names(mapnames) <- se@elementMetadata@listData$id
 
@@ -39,9 +42,6 @@ write.csv(export_tpms(se, "II"), paste0(morpholino_dir, "tpms_rep_II.csv"))
 
 ## Preprocessing
 ```{r}
-se <- se[, !grepl("Wdr5", se@colData@listData$group)]
-se <- se[, !grepl("256c Rep", se@colData@listData$group)]
-
 se@colData@listData$group <- sapply(se@colData@listData$group, function(x) {
     words <- unlist(strsplit(x, " "))
     paste(words[-2], collapse = " ")
